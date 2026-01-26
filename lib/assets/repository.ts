@@ -40,8 +40,11 @@ export async function getAssetById(supabase: SupabaseClient, id: string): Promis
 export async function updateAsset(supabase: SupabaseClient, id: string, params: UpdateAssetParams): Promise<AssetRecord> {
   const updates: any = { updated_at: new Date().toISOString() };
   if (params.status) updates.status = params.status;
-  if (params.meta) updates.meta = params.meta; // Note: this replaces the jsonb, might want jsonb_set in SQL if partial
+  if (params.transcriptionStatus) updates.transcription_status = params.transcriptionStatus;
+  if (params.meta) updates.meta = params.meta; 
+  if (params.captions !== undefined) updates.captions = params.captions;
   if (params.errorMessage !== undefined) updates.error_message = params.errorMessage;
+  if (params.storageKey !== undefined) updates.storage_key = params.storageKey;
 
   const { data, error } = await supabase
     .from("assets")
@@ -77,4 +80,13 @@ export async function listAssets(supabase: SupabaseClient, userId: string, proje
   const nextCursor = assets.length === limit ? assets[assets.length - 1].createdAt : undefined;
 
   return { assets, nextCursor };
+}
+
+export async function deleteAsset(supabase: SupabaseClient, id: string): Promise<void> {
+  const { error } = await supabase
+    .from("assets")
+    .delete()
+    .eq("id", id);
+
+  if (error) throw error;
 }

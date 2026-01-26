@@ -11,7 +11,8 @@ import {
     Clock,
     AlertCircle,
     Search,
-    Loader2
+    Loader2,
+    Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -133,6 +134,27 @@ export function SourcePanel({
             console.error("URL failed", err);
         } finally {
             setIsResolving(false);
+        }
+    };
+
+    const handleDeleteAsset = async (e: React.MouseEvent, assetId: string) => {
+        e.stopPropagation();
+        if (!confirm("Are you sure you want to delete this source? This will remove it from the project.")) return;
+
+        try {
+            const res = await fetch(`/api/assets/${assetId}`, {
+                method: 'DELETE',
+            });
+
+            if (res.ok) {
+                onAssetsChange(assets.filter(a => a.id !== assetId));
+            } else {
+                const data = await res.json();
+                alert(data.error || "Failed to delete source");
+            }
+        } catch (err) {
+            console.error("Delete failed", err);
+            alert("An error occurred while deleting");
         }
     };
 
@@ -258,7 +280,7 @@ export function SourcePanel({
                                     ) : (
                                         <FileVideo className="size-6 text-muted-foreground/30" />
                                     )}
-                                    {(asset.status === 'downloading' || asset.status === 'processing' || asset.status === 'uploading') && (
+                                    {(asset.status === 'downloading' || asset.status === 'processing' || asset.status === 'uploading' || asset.transcriptionStatus === 'transcribing') && (
                                         <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                                             <Loader2 className="size-4 text-white animate-spin" />
                                         </div>
@@ -285,9 +307,16 @@ export function SourcePanel({
                                     </div>
                                 </div>
 
-                                <div className="absolute -right-8 group-hover:right-2 transition-all opacity-0 group-hover:opacity-100 flex gap-1">
-                                    <div className="size-6 rounded-lg bg-background border flex items-center justify-center">
-                                        <Plus className="size-3" />
+                                <div className="absolute -right-12 group-hover:right-2 transition-all opacity-0 group-hover:opacity-100 flex gap-1">
+                                    <div
+                                        className="size-7 rounded-lg bg-background border flex items-center justify-center hover:bg-destructive hover:text-destructive-foreground transition-colors cursor-pointer"
+                                        onClick={(e) => handleDeleteAsset(e, asset.id)}
+                                        title="Delete Source"
+                                    >
+                                        <Trash2 className="size-3.5" />
+                                    </div>
+                                    <div className="size-7 rounded-lg bg-background border flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-colors cursor-pointer">
+                                        <Plus className="size-3.5" />
                                     </div>
                                 </div>
                             </button>

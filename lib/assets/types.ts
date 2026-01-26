@@ -1,4 +1,5 @@
-export type AssetStatus = 'uploading' | 'uploaded' | 'failed' | 'downloading';
+export type AssetStatus = 'uploading' | 'uploaded' | 'failed' | 'downloading' | 'processing';
+export type TranscriptionStatus = 'idle' | 'transcribing' | 'completed' | 'failed';
 
 export type AssetMeta = {
   size?: number;
@@ -17,7 +18,9 @@ export type AssetRecord = {
   storageKey: string | null;
   sourceUrl?: string | null;
   status: AssetStatus;
+  transcriptionStatus: TranscriptionStatus;
   meta: AssetMeta;
+  captions?: any; // format: CaptionData
   errorMessage?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -35,6 +38,9 @@ export type CreateAssetParams = {
 
 export type UpdateAssetParams = {
   status?: AssetStatus;
+  transcriptionStatus?: TranscriptionStatus;
   meta?: AssetMeta;
+  captions?: any;
   errorMessage?: string;
+  storageKey?: string;
 };

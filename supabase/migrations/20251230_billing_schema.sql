@@ -21,14 +21,14 @@ insert into public.plans (id, name, price_monthly, price_yearly, quota_descripti
  '{"sttMinutes": 30, "translationLanguages": 0, "concurrentJobs": 1, "storageDays": 3}'::jsonb,
  '{"priority": false, "apiAccess": false, "watermark": true}'::jsonb
 ),
-('starter', 'Starter', 19000, 190000, '300분',
- '[{"text":"STT"},{"text":"번역 1개 언어"},{"text":"SRT/VTT"},{"text":"워터마크","value":"OFF"},{"text":"보관 30일"},{"text":"동시 Job 3"},{"text":"지원: 이메일"}]'::jsonb,
- '{"sttMinutes": 300, "translationLanguages": 1, "concurrentJobs": 3, "storageDays": 30}'::jsonb,
+('creator', 'Creator', 19900, 190800, '450분',
+ '[{"text":"STT"},{"text":"번역 3개 언어"},{"text":"SRT/VTT"},{"text":"워터마크","value":"OFF"},{"text":"보관 60일"},{"text":"동시 Job 5"},{"text":"지원: 이메일"}]'::jsonb,
+ '{"sttMinutes": 450, "translationLanguages": 3, "concurrentJobs": 5, "storageDays": 60}'::jsonb,
  '{"priority": false, "apiAccess": false, "watermark": false}'::jsonb
 ),
-('pro', 'Pro', 59000, 590000, '1500분',
- '[{"text":"STT"},{"text":"번역 최대 5개 언어"},{"text":"SRT/VTT/TXT"},{"text":"자막 스타일"},{"text":"우선 처리"},{"text":"보관 180일"},{"text":"동시 Job 10"},{"text":"팀 멤버 3"},{"text":"Webhook"},{"text":"API(기본)"}]'::jsonb,
- '{"sttMinutes": 1500, "translationLanguages": 5, "concurrentJobs": 10, "storageDays": 180}'::jsonb,
+('pro', 'Pro', 59900, 574800, '1800분',
+ '[{"text":"STT"},{"text":"번역 무제한"},{"text":"SRT/VTT/TXT"},{"text":"자막 스타일 커스텀"},{"text":"우선 처리"},{"text":"보관 180일"},{"text":"동시 Job 20"},{"text":"팀 멤버 3"},{"text":"Webhook"},{"text":"API(기본)"}]'::jsonb,
+ '{"sttMinutes": 1800, "translationLanguages": 99, "concurrentJobs": 20, "storageDays": 180}'::jsonb,
  '{"priority": true, "apiAccess": true, "watermark": false}'::jsonb
 ),
 ('enterprise', 'Enterprise', null, null, '대량/계약',

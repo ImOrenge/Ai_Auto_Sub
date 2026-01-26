@@ -642,7 +642,7 @@ export default function StudioPage() {
 
     return (
         <div className="flex flex-col h-[calc(100vh-64px)] overflow-hidden">
-            <div className="px-6 py-4">
+            <div className="px-4 py-3 border-b border-foreground/10 bg-card">
                 <StudioTopBar
                     project={project}
                     allProjects={allProjects}
@@ -651,33 +651,30 @@ export default function StudioPage() {
                 />
             </div>
 
-            <div className="flex-1 p-6 overflow-y-auto bg-gray-50/30 dark:bg-black/20">
+            <div className="flex-1 p-4 overflow-y-auto bg-background">
                 {/* Success Notification */}
                 {notification && (
-                    <div className="fixed top-4 right-4 z-50 bg-green-600 text-white px-6 py-4 rounded-lg shadow-lg flex items-center gap-3 animate-in slide-in-from-top">
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <div className="fixed top-4 right-4 z-50 bg-foreground text-background px-4 py-3 border border-background shadow-2xl flex items-center gap-3 animate-in fade-in">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                         </svg>
-                        <span className="font-medium">{notification}</span>
+                        <span className="text-xs font-bold uppercase tracking-widest">{notification}</span>
                     </div>
                 )}
 
                 {/* Error Banner */}
                 {error && (
-                    <div className="max-w-6xl mx-auto mb-4">
-                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
-                            <svg className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                            </svg>
+                    <div className="max-w-full mb-4">
+                        <div className="bg-destructive text-destructive-foreground border border-destructive p-3 flex items-start gap-3">
                             <div className="flex-1">
-                                <h3 className="text-sm font-medium text-red-800 dark:text-red-200">Error</h3>
-                                <p className="text-sm text-red-700 dark:text-red-300 mt-1">{error}</p>
+                                <h3 className="text-xs font-bold uppercase">Error</h3>
+                                <p className="text-xs mt-1">{error}</p>
                             </div>
                             <button
                                 onClick={() => setError(null)}
-                                className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200"
+                                className="hover:opacity-70"
                             >
-                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                     <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                                 </svg>
                             </button>
@@ -736,7 +733,7 @@ export default function StudioPage() {
                                         <select
                                             value={selectedQueueId || ''}
                                             onChange={e => setSelectedQueueId(e.target.value)}
-                                            className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500"
+                                            className="px-3 py-1.5 text-xs border border-foreground/20 bg-background focus:ring-1 focus:ring-foreground"
                                             disabled={queues.length === 0}
                                         >
                                             {queues.length === 0 ? (

@@ -74,11 +74,20 @@ export async function POST(request: Request) {
       filename: filename || "Untitled",
       storageKey: body.storageKey || null,
       sourceUrl: body.sourceUrl,
-      status: status as any,
+      status: body.sourceUrl ? 'downloading' : status as any,
       meta,
     };
 
     const asset = await createAsset(supabase, params);
+
+    // If it's a URL-based asset, start the background download
+    if (body.sourceUrl) {
+      const { startUrlDownload } = await import("@/lib/assets/service");
+      startUrlDownload(user.id, asset.id, body.sourceUrl).catch(err => {
+        console.error("[Assets API] Failed to start URL download:", err);
+      });
+    }
+
     return NextResponse.json(asset, { status: 201 });
   } catch (error) {
     console.error("[Assets] Create failed:", error);

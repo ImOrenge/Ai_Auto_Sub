@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
+import { useEditor } from "./EditorContext";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,22 +13,8 @@ import {
 } from "lucide-react";
 
 type InOutControlsProps = {
-    /** Current playback time */
-    currentTime: number;
-    /** Total duration */
-    duration: number;
-    /** In point (null = not set) */
-    inPoint: number | null;
-    /** Out point (null = not set) */
-    outPoint: number | null;
-    /** Set In point */
-    onSetInPoint: (time: number | null) => void;
-    /** Set Out point */
-    onSetOutPoint: (time: number | null) => void;
     /** Add marked range to timeline */
     onAddToTimeline?: () => void;
-    /** Seek to time */
-    onSeek: (time: number) => void;
 };
 
 /**
@@ -35,15 +22,17 @@ type InOutControlsProps = {
  * Shows current marking and allows setting/clearing In/Out points
  */
 export function InOutControls({
-    currentTime,
-    duration,
-    inPoint,
-    outPoint,
-    onSetInPoint,
-    onSetOutPoint,
     onAddToTimeline,
-    onSeek,
 }: InOutControlsProps) {
+    const {
+        currentTime,
+        duration,
+        inPoint,
+        outPoint,
+        setInPoint: onSetInPoint,
+        setOutPoint: onSetOutPoint,
+        setCurrentTime: onSeek
+    } = useEditor();
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
