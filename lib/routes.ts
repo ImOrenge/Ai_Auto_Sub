@@ -1,14 +1,15 @@
 export const routes = {
   dashboard: () => "/dashboard",
   projects: () => "/projects",
-  jobs: () => "/jobs",
 
   project: (projectId: string) => `/projects/${projectId}`,
-  studio: (projectId: string) => `/projects/${projectId}/studio`,
-  projectJobs: (projectId: string) => `/projects/${projectId}/jobs`,
-  queue: (projectId: string, queueId: string) => `/projects/${projectId}/queues/${queueId}`,
-  editor: (projectId: string, jobId: string) => `/projects/${projectId}/editor/${jobId}`,
-  glossary: (projectId: string) => `/projects/${projectId}/glossary`,
+  // studio: removed - use projectEditor
+  editor: (projectId: string, jobId: string) => `/projects/${projectId}/jobs/${jobId}/edit`,
+  jobEditor: (jobId: string) => `/jobs/${jobId}/edit`,
+  projectEditor: (projectId: string) => `/projects/${projectId}/editor`,
+  exports: (projectId: string) => `/projects/${projectId}/exports`,
+  exportResult: (projectId: string, jobId: string) => `/projects/${projectId}/jobs/${jobId}/export`,
+  assetsHub: (projectId: string) => `/projects/${projectId}/assets`,
 
   settings: {
     profile: () => "/settings/profile",
@@ -32,18 +33,16 @@ export function buildDashboardNav(): NavItem[] {
   return [
     { key: "dashboard", label: "Dashboard", href: routes.dashboard() },
     { key: "projects", label: "Projects", href: routes.projects() },
-    { key: "stats", label: "Statistics", href: "/stats" }, // Placeholder
     { key: "api", label: "API", href: "/settings/api" }, // Link to API settings
   ]
 }
 
 export function buildProjectNav(projectId: string): NavItem[] {
   return [
-    { key: "studio", label: "Upload Studio", href: routes.studio(projectId) },
-    { key: "uploads", label: "Uploads", href: `/projects/${projectId}/uploads` },
-    { key: "queue", label: "Queue", href: `/projects/${projectId}/queues` },
-    { key: "jobs", label: "Jobs", href: routes.projectJobs(projectId) },
-    { key: "glossary", label: "Glossary", href: routes.glossary(projectId) },
+    { key: "overview", label: "Dashboard", href: routes.project(projectId) },
+    { key: "editor", label: "Editor", href: routes.projectEditor(projectId) },
+    { key: "assets", label: "Media Assets", href: routes.assetsHub(projectId) },
+    { key: "exports", label: "Export History", href: routes.exports(projectId) },
     { key: "settings", label: "Project Settings", href: `/projects/${projectId}/settings` },
   ]
 }

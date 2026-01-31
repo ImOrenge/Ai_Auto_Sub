@@ -1,4 +1,4 @@
-export type PlanId = "free" | "starter" | "pro" | "enterprise";
+export type PlanId = "free" | "creator" | "pro" | "enterprise";
 
 export type BillingCycle = "monthly" | "yearly";
 
@@ -9,6 +9,7 @@ export interface PlanLimits {
   translationLanguages: number; // Max concurrent languages or total
   concurrentJobs: number;
   storageDays: number;
+  maxProjects: number;
 }
 
 export interface PlanFeatures {
@@ -60,6 +61,11 @@ export interface EntitlementSummary {
   jobs: {
     concurrentLimit: number;
     activeCount: number;
+  };
+  
+  projects: {
+    maxLimit: number;
+    currentCount: number;
   };
 
   // Feature Flags

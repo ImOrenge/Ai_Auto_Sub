@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DEFAULT_SUBTITLE_CONFIG } from "@/lib/jobs/types";
+import { uploadFileToSignedUrl } from "@/lib/uploadClient";
 
 type InputMode = "url" | "upload";
 
@@ -27,14 +28,11 @@ type JobCreationResponse = {
     };
 };
 
-type UploadJobResponse = {
-    job: {
+type UploadSessionResponse = {
+    asset: {
         id: string;
-        url: string;
     };
-    upload: {
-        publicUrl: string;
-    };
+    signedUrl: string;
 };
 
 type ErrorResponse = {
@@ -42,6 +40,7 @@ type ErrorResponse = {
 };
 
 type VideoInputPipelineProps = {
+    projectId: string;
     className?: string;
 };
 
@@ -58,7 +57,7 @@ const demoSources = [
     },
 ];
 
-export function VideoInputPipeline({ className }: VideoInputPipelineProps) {
+export function VideoInputPipeline({ projectId, className }: VideoInputPipelineProps) {
     const [mode, setMode] = useState<InputMode>("url");
     const [url, setUrl] = useState("");
     const [file, setFile] = useState<File | null>(null);
@@ -135,6 +134,7 @@ export function VideoInputPipeline({ className }: VideoInputPipelineProps) {
                     },
                     body: JSON.stringify({
                         url: trimmedUrl,
+                        projectId,
                         autoStart: true,
                         subtitleConfig: DEFAULT_SUBTITLE_CONFIG,
                     }),
@@ -166,23 +166,53 @@ export function VideoInputPipeline({ className }: VideoInputPipelineProps) {
 
             setIsSubmitting(true);
             try {
-                const formData = new FormData();
-                formData.append("file", file);
-                formData.append("autoStart", "true");
-                formData.append("subtitleConfig", JSON.stringify(DEFAULT_SUBTITLE_CONFIG));
-
-                const response = await fetch("/api/uploads", {
+                const sessionResponse = await fetch("/api/uploads/session", {
                     method: "POST",
-                    body: formData,
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        filename: file.name,
+                        sizeBytes: file.size,
+                        mimeType: file.type || "application/octet-stream",
+                    }),
                 });
-                const payload = (await response.json()) as UploadJobResponse & ErrorResponse;
+                const sessionPayload = (await sessionResponse.json()) as UploadSessionResponse & ErrorResponse;
 
-                if (!response.ok) {
-                    throw new Error(payload.error ?? "업로드를 처리할 수 없습니다.");
+                if (!sessionResponse.ok) {
+                    throw new Error(sessionPayload.error ?? "Upload request failed.");
                 }
 
-                setJobId(payload.job.id);
-                setSuccess("업로드가 완료되었어요. 파이프라인을 확인해보세요!");
+                await uploadFileToSignedUrl(file, sessionPayload.signedUrl);
+
+                const completeResponse = await fetch("/api/uploads/complete", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ assetId: sessionPayload.asset.id }),
+                });
+                const completePayload = (await completeResponse.json()) as ErrorResponse;
+
+                if (!completeResponse.ok) {
+                    throw new Error(completePayload.error ?? "Upload completion failed.");
+                }
+
+                const jobResponse = await fetch("/api/jobs", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        assetId: sessionPayload.asset.id,
+                        projectId,
+                        autoStart: true,
+                        subtitleConfig: DEFAULT_SUBTITLE_CONFIG,
+                        sourceType: "upload",
+                    }),
+                });
+                const jobPayload = (await jobResponse.json()) as JobCreationResponse & ErrorResponse;
+
+                if (!jobResponse.ok) {
+                    throw new Error(jobPayload.error ?? "Job creation failed.");
+                }
+
+                setJobId(jobPayload.job.id);
+                setSuccess("Upload complete. Check the pipeline status.");
                 setFile(null);
                 setInputKey((value) => value + 1);
             } catch (uploadError) {

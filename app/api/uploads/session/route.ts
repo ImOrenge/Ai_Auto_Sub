@@ -1,15 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createUploadSession } from "@/lib/assets/service";
+import { MOCK_USER_ID } from "@/lib/utils";
 
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
 
     const body = await request.json();
     const { filename, sizeBytes, mimeType, projectId } = body;
@@ -18,9 +15,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
+    const effectiveUserId = user?.id ?? MOCK_USER_ID;
+    const effectiveProjectId = user ? projectId : undefined;
+
     const session = await createUploadSession({
-      userId: user.id,
-      projectId, // Pass projectId
+      userId: effectiveUserId,
+      projectId: effectiveProjectId, // Prevent linking anonymous uploads to real projects
       filename,
       sizeBytes,
       mimeType,

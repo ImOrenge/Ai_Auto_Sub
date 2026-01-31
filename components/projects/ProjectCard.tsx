@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { routes } from '@/lib/routes';
 import { Project } from '@/lib/projects/types';
 
 interface ProjectCardProps {
@@ -10,7 +11,7 @@ interface ProjectCardProps {
 
 export function ProjectCard({ project }: ProjectCardProps) {
     return (
-        <Link href={`/projects/${project.id}/studio`}>
+        <Link href={routes.project(project.id)}>
             <div className="group relative block h-full rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:border-blue-500 hover:shadow-md dark:border-gray-800 dark:bg-gray-900 dark:hover:border-blue-500">
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">

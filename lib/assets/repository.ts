@@ -39,6 +39,7 @@ export async function getAssetById(supabase: SupabaseClient, id: string): Promis
 
 export async function updateAsset(supabase: SupabaseClient, id: string, params: UpdateAssetParams): Promise<AssetRecord> {
   const updates: any = { updated_at: new Date().toISOString() };
+  if (params.filename) updates.filename = params.filename;
   if (params.status) updates.status = params.status;
   if (params.transcriptionStatus) updates.transcription_status = params.transcriptionStatus;
   if (params.meta) updates.meta = params.meta; 

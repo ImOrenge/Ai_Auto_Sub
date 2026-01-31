@@ -52,7 +52,7 @@ function VerifyEmailContent() {
 
             // Redirect to projects after 1.5 seconds
             setTimeout(() => {
-                router.push("/projects");
+                router.push("/policy-accept?next=/projects&flow=signup");
                 router.refresh();
             }, 1500);
         } catch (error) {

@@ -59,7 +59,7 @@ export function ContinueCard({ lastProject }: ContinueCardProps) {
 
             <div className="flex items-center gap-3 w-full md:w-auto">
                 <Link
-                    href={routes.studio(lastProject.id)}
+                    href={routes.projectEditor(lastProject.id)}
                     className="flex-1 md:flex-none px-5 py-2.5 bg-primary text-primary-foreground font-medium rounded-lg text-sm shadow hover:bg-primary/90 transition flex items-center justify-center gap-2"
                 >
                     Open Studio

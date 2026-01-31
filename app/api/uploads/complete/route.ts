@@ -1,15 +1,14 @@
 import { NextResponse } from "next/server";
 import { completeUpload } from "@/lib/assets/service";
 import { createClient } from "@/lib/supabase/server";
+import { MOCK_USER_ID } from "@/lib/utils";
 
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const effectiveUserId = user?.id ?? MOCK_USER_ID;
 
     const body = await request.json();
     const { assetId } = body;
@@ -18,7 +17,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "assetId is required" }, { status: 400 });
     }
 
-    const asset = await completeUpload(user.id, assetId);
+    const asset = await completeUpload(effectiveUserId, assetId);
 
     return NextResponse.json({ asset });
   } catch (error) {

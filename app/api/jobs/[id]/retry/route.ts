@@ -23,8 +23,8 @@ export async function POST(
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
     }
 
-    // Only allow retrying failed or canceled jobs
-    const retryableStatuses = ["error", "canceled"];
+    // Only allow retrying failed, canceled or STALLED jobs
+    const retryableStatuses = ["error", "canceled", "translating", "preprocessing"];
 
     if (!retryableStatuses.includes(job.status)) {
       return NextResponse.json(
@@ -37,6 +37,7 @@ export async function POST(
     const newJob = await insertJobRecord({
       url: job.url,
       userId: job.userId,
+      assetId: job.assetId,
       sourceType: job.sourceType,
       subtitleConfig: job.subtitleConfig,
     });

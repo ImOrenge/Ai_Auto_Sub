@@ -220,7 +220,11 @@ function JobsPageContent() {
     const handleJobExport = async (jobId: string) => {
         setIndividualActionLoading(jobId);
         try {
-            const res = await fetch(`/api/jobs/${jobId}/export`, { method: 'POST' });
+            const res = await fetch(`/api/jobs/${jobId}/export`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ format: 'mp4' })
+            });
             if (!res.ok) throw new Error('Export failed');
             const data = await res.json();
             if (data.downloadUrl) {
@@ -252,8 +256,8 @@ function JobsPageContent() {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-semibold tracking-tight">Project Jobs</h1>
-                    <p className="text-sm text-muted-foreground">Manage jobs for this project.</p>
+                    <h1 className="text-3xl font-semibold tracking-tight">Export History & Tasks</h1>
+                    <p className="text-sm text-muted-foreground">관리 중인 모든 작업과 내보내기 내역을 확인합니다.</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <form onSubmit={(e) => { e.preventDefault(); updateFilters({ search: searchInput }); }} className="relative">

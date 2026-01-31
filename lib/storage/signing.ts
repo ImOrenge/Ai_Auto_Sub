@@ -37,13 +37,18 @@ function extractStorageRef(rawUrl: string): StorageObjectRef | null {
   }
 
   if (parsed.pathname.startsWith(SUPABASE_PUBLIC_PREFIX)) {
-    return parseBucketAndPath(parsed.pathname.slice(SUPABASE_PUBLIC_PREFIX.length));
+    const ref = parseBucketAndPath(parsed.pathname.slice(SUPABASE_PUBLIC_PREFIX.length));
+    console.debug(`[storage] Extracted public ref: ${ref?.bucket}/${ref?.objectPath}`);
+    return ref;
   }
 
   if (parsed.pathname.startsWith(SUPABASE_SIGNED_PREFIX)) {
-    return parseBucketAndPath(parsed.pathname.slice(SUPABASE_SIGNED_PREFIX.length));
+    const ref = parseBucketAndPath(parsed.pathname.slice(SUPABASE_SIGNED_PREFIX.length));
+    console.debug(`[storage] Extracted signed ref: ${ref?.bucket}/${ref?.objectPath}`);
+    return ref;
   }
 
+  console.debug(`[storage] URL does not match Supabase storage pattern: ${rawUrl}`);
   return null;
 }
 
@@ -84,6 +89,8 @@ async function ensureSignedUrl(input: string | null): Promise<string | null> {
     const signedUrl = data.signedUrl.startsWith("http")
       ? data.signedUrl
       : new URL(data.signedUrl, env.supabaseUrl).toString();
+      
+    console.debug(`[storage] Signed URL successfully: ${signedUrl.slice(0, 50)}...`);
     return signedUrl;
   } catch (error) {
     console.warn(`[storage] Unexpected error while signing ${ref.bucket}/${ref.objectPath}`, error);
@@ -112,6 +119,9 @@ export async function withSignedJobAssets(job: JobRecord): Promise<JobRecord> {
     } catch (e) {
       console.warn(`[storage] Error signing asset: ${e}`);
     }
+  } else if (job.asset?.sourceUrl) {
+    // Fallback to sourceUrl if no storage key exists (URL-based asset)
+    assetSignedUrl = job.asset.sourceUrl;
   }
 
   const [srtUrl, videoUrl] = await Promise.all([

@@ -111,8 +111,8 @@ export function JobDetailDrawer({ job, onClose, projectId }: JobDetailDrawerProp
                                                     <FileText className="size-4" />
                                                 </div>
                                                 <div className="text-sm">
-                                                    <p className="font-medium">Subtitles (SRT)</p>
-                                                    <p className="text-xs text-muted-foreground">Standard SRT format</p>
+                                                    <p className="font-medium">Source Captions (SRT)</p>
+                                                    <p className="text-xs text-muted-foreground">Original transcription</p>
                                                 </div>
                                             </div>
                                             <Download className="size-4 text-muted-foreground" />
@@ -121,12 +121,22 @@ export function JobDetailDrawer({ job, onClose, projectId }: JobDetailDrawerProp
                                     {job.resultVideoUrl && (
                                         <a href={job.resultVideoUrl} download className="flex items-center justify-between p-3 rounded-xl border hover:bg-secondary/50 transition-colors">
                                             <div className="flex items-center gap-3">
-                                                <div className="p-2 bg-blue-500/10 rounded-lg text-blue-600">
+                                                <div className={cn(
+                                                    "p-2 rounded-lg",
+                                                    job.status === 'done' ? "bg-blue-500/10 text-blue-600" : "bg-slate-500/10 text-slate-600"
+                                                )}>
                                                     <Play className="size-4" />
                                                 </div>
                                                 <div className="text-sm">
-                                                    <p className="font-medium">Burned-in Video</p>
-                                                    <p className="text-xs text-muted-foreground">Video with subtitles</p>
+                                                    <p className="font-medium">
+                                                        {job.status === 'done' ? "Burned-in Video" : "Source Video (Original)"}
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {job.status === 'done'
+                                                            ? "Video with subtitles merged"
+                                                            : "Uploaded source without subtitles"
+                                                        }
+                                                    </p>
                                                 </div>
                                             </div>
                                             <Download className="size-4 text-muted-foreground" />

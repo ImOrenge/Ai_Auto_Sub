@@ -1,4 +1,4 @@
-export type PlanId = "free" | "starter" | "pro" | "enterprise";
+export type PlanId = "free" | "creator" | "pro" | "enterprise";
 
 export type PricingPlan = {
   id: PlanId;
@@ -44,49 +44,49 @@ export const pricingPlans: PricingPlan[] = [
     emphasis: "Low",
   },
   {
-    id: "starter",
-    name: "Starter",
-    priceMonthly: 19000,
-    priceYearly: 190000,
-    quota: "300분",
+    id: "creator",
+    name: "Creator",
+    priceMonthly: 19900,
+    priceYearly: 190800, // 20% discount
+    quota: "450분",
     features: [
       { text: "STT" },
-      { text: "번역 1개 언어" },
+      { text: "번역 3개 언어" },
       { text: "SRT/VTT" },
       { text: "워터마크", value: "OFF" },
-      { text: "보관 30일" },
-      { text: "동시 Job 3" },
+      { text: "보관 60일" },
+      { text: "동시 Job 5" },
       { text: "지원: 이메일" },
     ],
     cta: {
       text: "시작하기",
       variant: "primary",
-      href: "/signup?from=pricing&plan=starter",
+      href: "/signup?from=pricing&plan=creator",
     },
     emphasis: "Medium",
   },
   {
     id: "pro",
     name: "Pro",
-    priceMonthly: 59000,
-    priceYearly: 590000,
+    priceMonthly: 59900,
+    priceYearly: 574800, // 20% discount
     badge: "추천",
-    quota: "1500분",
+    quota: "1800분",
     features: [
       { text: "STT" },
-      { text: "번역 최대 5개 언어" },
+      { text: "번역 무제한" },
       { text: "SRT/VTT/TXT" },
-      { text: "자막 스타일" },
+      { text: "자막 스타일 커스텀" },
       { text: "우선 처리" },
       { text: "보관 180일" },
-      { text: "동시 Job 10" },
+      { text: "동시 Job 20" },
       { text: "팀 멤버 3" },
       { text: "Webhook" },
       { text: "API(기본)" },
     ],
     cta: {
       text: "Pro로 업그레이드",
-      variant: "primary", // Special styling for Pro
+      variant: "primary",
       href: "/signup?from=pricing&plan=pro",
     },
     emphasis: "High",
@@ -117,23 +117,23 @@ export const pricingPlans: PricingPlan[] = [
 export type ComparisonRow = {
   feature: string;
   free: string;
-  starter: string;
+  creator: string;
   pro: string;
   enterprise: string;
 };
 
 export const comparisonRows: ComparisonRow[] = [
-  { feature: "월 제공량", free: "30분", starter: "300분", pro: "1500분", enterprise: "계약" },
-  { feature: "STT", free: "O", starter: "O", pro: "O", enterprise: "O" },
-  { feature: "번역 언어", free: "X", starter: "1", pro: "최대 5", enterprise: "커스텀" },
-  { feature: "포맷", free: "SRT", starter: "SRT/VTT", pro: "SRT/VTT/TXT", enterprise: "커스텀" },
-  { feature: "워터마크", free: "ON", starter: "OFF", pro: "OFF", enterprise: "OFF" },
-  { feature: "우선 처리", free: "X", starter: "X", pro: "O", enterprise: "O(SLA)" },
-  { feature: "Webhook", free: "X", starter: "X", pro: "O", enterprise: "O" },
-  { feature: "API", free: "X", starter: "X", pro: "기본", enterprise: "Full" },
-  { feature: "팀 멤버", free: "1", starter: "1", pro: "3", enterprise: "무제한" },
-  { feature: "보관 기간", free: "3일", starter: "30일", pro: "180일", enterprise: "계약" },
-  { feature: "동시 Job", free: "1", starter: "3", pro: "10", enterprise: "커스텀" },
+  { feature: "월 제공량", free: "30분", creator: "450분", pro: "1800분", enterprise: "계약" },
+  { feature: "STT", free: "O", creator: "O", pro: "O", enterprise: "O" },
+  { feature: "번역 언어", free: "X", creator: "3", pro: "무제한", enterprise: "커스텀" },
+  { feature: "포맷", free: "SRT", creator: "SRT/VTT", pro: "SRT/VTT/TXT", enterprise: "커스텀" },
+  { feature: "워터마크", free: "ON", creator: "OFF", pro: "OFF", enterprise: "OFF" },
+  { feature: "우선 처리", free: "X", creator: "X", pro: "O", enterprise: "O(SLA)" },
+  { feature: "Webhook", free: "X", creator: "X", pro: "O", enterprise: "O" },
+  { feature: "API", free: "X", creator: "X", pro: "기본", enterprise: "Full" },
+  { feature: "팀 멤버", free: "1", creator: "1", pro: "3", enterprise: "무제한" },
+  { feature: "보관 기간", free: "3일", creator: "60일", pro: "180일", enterprise: "계약" },
+  { feature: "동시 Job", free: "1", creator: "5", pro: "20", enterprise: "커스텀" },
 ];
 
 export const overagePolicy = {

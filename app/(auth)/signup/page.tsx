@@ -75,7 +75,7 @@ export default function SignupPage() {
           type: "success",
           text: "가입이 완료되었습니다. 잠시 후 프로젝트 목록으로 이동합니다.",
         });
-        router.push("/projects");
+        router.push("/policy-accept?next=/projects&flow=signup");
       }
     } catch (error) {
       console.error(error);
@@ -92,7 +92,8 @@ export default function SignupPage() {
     setMessage(null);
     setSocialLoading(provider);
     try {
-      const redirectTo = `${window.location.origin}/api/auth/callback?next=/projects`;
+      const nextPath = "/policy-accept?next=/projects&flow=signup";
+      const redirectTo = `${window.location.origin}/api/auth/callback?next=${encodeURIComponent(nextPath)}`;
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {

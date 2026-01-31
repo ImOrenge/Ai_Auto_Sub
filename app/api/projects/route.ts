@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from 'next/server';
+import { BillingService } from "@/lib/billing/service";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -12,6 +13,13 @@ export async function POST(request: Request) {
   try {
     const json = await request.json();
     const { name, description } = json;
+
+    const entitlements = await BillingService.getEntitlements(user.id);
+    if (entitlements.projects.currentCount >= entitlements.projects.maxLimit) {
+      return NextResponse.json({ 
+        error: `Project limit reached (${entitlements.projects.currentCount}/${entitlements.projects.maxLimit}). Please upgrade your plan.` 
+      }, { status: 403 });
+    }
 
     if (!name) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
@@ -29,21 +37,14 @@ export async function POST(request: Request) {
 
     if (error) throw error;
 
-    // Auto-create default queue
     const { error: queueError } = await supabase
         .from('queues')
         .insert({
             user_id: user.id,
             project_id: data.id,
-            name: 'General Queue',
+            name: 'Default',
             default_options: { type: 'general' }
         });
-
-    if (queueError) {
-        console.error("Failed to create default queue for project", data.id, queueError);
-        // We don't fail the request, but we log it. 
-        // Logic could be added to delete the project if this fails, but it's better to allow "empty" projects and let user retry queue creation.
-    }
 
     return NextResponse.json({ project: data });
   } catch (error: any) {
@@ -69,5 +70,5 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json(data);
+  return NextResponse.json({ projects: data ?? [] });
 }

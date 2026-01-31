@@ -120,7 +120,10 @@ export function JobTable({ jobs, selectedIds, onToggleSelect, onSelectAll, onVie
                                     <div className="flex items-center gap-2 w-24">
                                         <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
                                             <div
-                                                className="h-full bg-primary transition-all duration-500"
+                                                className={cn(
+                                                    "h-full bg-primary transition-all duration-500",
+                                                    !["done", "succeeded", "error", "failed", "canceled", "draft"].includes(job.status) && "animate-progress-stripes"
+                                                )}
                                                 style={{ width: `${(job.progress || 0) * 100}%` }}
                                             />
                                         </div>

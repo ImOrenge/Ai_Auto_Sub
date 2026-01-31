@@ -91,7 +91,7 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
                             <DialogTitle className="text-xl font-bold tracking-tight">로그인</DialogTitle>
                             <button
                                 onClick={() => onOpenChange(false)}
-                                className="rounded-full p-1 hover:bg-muted/50 transition-colors"
+                                className="p-1 hover:bg-muted/50 transition-colors"
                             >
                                 <X className="w-4 h-4 text-muted-foreground" />
                                 <span className="sr-only">Close</span>
@@ -112,7 +112,7 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
                                 placeholder="studio@example.com"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                className="flex h-10 w-full rounded-md border border-input bg-background/50 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex h-10 w-full border border-input bg-background/50 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             />
                         </div>
                         <div className="space-y-2">
@@ -126,13 +126,13 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
                                 placeholder="••••••••"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="flex h-10 w-full rounded-md border border-input bg-background/50 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex h-10 w-full border border-input bg-background/50 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             />
                         </div>
 
                         {message && (
                             <div
-                                className={`p-3 rounded-md text-sm ${message.type === "error"
+                                className={`p-3 text-sm ${message.type === "error"
                                     ? "bg-red-500/10 text-red-500"
                                     : "bg-emerald-500/10 text-emerald-500"
                                     }`}
@@ -144,7 +144,7 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
                         <button
                             type="submit"
                             disabled={isSubmitting}
-                            className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 w-full"
+                            className="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 w-full"
                         >
                             {isSubmitting ? (
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -169,7 +169,7 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
                             type="button"
                             onClick={() => handleSocialLogin("google")}
                             disabled={Boolean(socialLoading) || isSubmitting}
-                            className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
+                            className="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
                         >
                             {socialLoading === "google" ? (
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -182,7 +182,7 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
                             type="button"
                             onClick={() => handleSocialLogin("github")}
                             disabled={Boolean(socialLoading) || isSubmitting}
-                            className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
+                            className="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
                         >
                             {socialLoading === "github" ? (
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

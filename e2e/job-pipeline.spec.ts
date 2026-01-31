@@ -60,7 +60,7 @@ Pipeline 단계 1
 Pipeline 단계 2`;
 
     await page.route("**/api/jobs", async (route, request) => {
-      const payload = (await request.postDataJSON()) as { url: string; autoStart: boolean };
+      const payload = (await request.postDataJSON()) as { url: string; autoStart: boolean; projectId: string };
       expect.soft(payload.url).toContain("storage.googleapis.com");
       expect(payload.autoStart).toBe(true);
 

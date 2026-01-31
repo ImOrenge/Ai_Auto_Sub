@@ -37,7 +37,7 @@ export function ProjectSwitcher({
             onSelectProject(projectId);
         } else {
             // Default behavior: Navigate to Studio
-            router.push(routes.studio(projectId));
+            router.push(routes.projectEditor(projectId));
         }
     };
 

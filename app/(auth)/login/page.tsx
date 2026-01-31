@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Chrome, Eye, EyeOff, Github, Loader2 } from "lucide-react";
@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 
 type SocialProvider = Extract<Provider, "google" | "github">;
 
-export default function LoginPage() {
+function LoginForm() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
@@ -27,7 +27,7 @@ export default function LoginPage() {
         setMessage(null);
 
         if (!email || !password) {
-            setMessage({ type: "error", text: "이메일과 비밀번호를 입력해주세요." });
+            setMessage({ type: "error", text: "Please enter your email and password." });
             return;
         }
 
@@ -45,15 +45,13 @@ export default function LoginPage() {
             let payload: { error?: string } = {};
             try {
                 payload = JSON.parse(responseText);
-            } catch {
-                // failed to parse
-            }
+            } catch { }
 
             if (!response.ok) {
-                throw new Error(payload.error || "로그인에 실패했습니다.");
+                throw new Error(payload.error || "Login failed.");
             }
 
-            setMessage({ type: "success", text: "로그인 성공! 이동 중..." });
+            setMessage({ type: "success", text: "Login successful! Redirecting..." });
             router.push(redirectedFrom);
             router.refresh();
 
@@ -61,7 +59,7 @@ export default function LoginPage() {
             console.error(error);
             setMessage({
                 type: "error",
-                text: error instanceof Error ? error.message : "로그인 중 오류가 발생했습니다.",
+                text: error instanceof Error ? error.message : "An error occurred during login.",
             });
         } finally {
             setIsSubmitting(false);
@@ -79,48 +77,52 @@ export default function LoginPage() {
                     redirectTo,
                 },
             });
-            if (error) {
-                throw error;
-            }
+            if (error) throw error;
         } catch (error) {
             console.error(error);
             setMessage({
                 type: "error",
-                text: error instanceof Error ? error.message : "소셜 로그인 중 오류가 발생했습니다.",
+                text: error instanceof Error ? error.message : "An error occurred during social login.",
             });
             setSocialLoading(null);
         }
     };
 
     return (
-        <div className="rounded-3xl border bg-card/80 p-6 shadow-sm lg:p-8">
-            <div className="space-y-1 text-center">
-                <p className="text-sm font-semibold text-primary">돌아오신 것을 환영합니다</p>
-                <h2 className="text-2xl font-semibold tracking-tight">로그인</h2>
-                <p className="text-sm text-muted-foreground">
-                    계정 정보를 입력하고 대시보드로 이동하세요.
+        <div className="border border-foreground/10 bg-background p-6 lg:p-10">
+            <div className="space-y-1 text-center mb-8">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Welcome Back</p>
+                <h2 className="text-2xl font-black uppercase tracking-tighter">Sign In</h2>
+                <p className="text-[11px] text-muted-foreground uppercase opacity-70">
+                    Access your dashboard and studio.
                 </p>
             </div>
+
             <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-                <label className="space-y-2 text-sm font-medium text-foreground">
-                    이메일 주소
+                <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block">
+                        Email Address
+                    </label>
                     <input
-                        className="w-full rounded-2xl border border-border bg-background/70 px-4 py-3 text-sm outline-none ring-primary/20 transition focus:ring-2"
+                        className="w-full border border-foreground/10 bg-background px-4 py-3 text-sm outline-none transition focus:border-foreground"
                         type="email"
                         autoComplete="email"
-                        placeholder="studio@example.com"
+                        placeholder="email@example.com"
                         value={email}
                         onChange={(event) => setEmail(event.target.value)}
                     />
-                </label>
-                <label className="space-y-2 text-sm font-medium text-foreground">
-                    비밀번호
-                    <div className="flex items-center rounded-2xl border border-border bg-background/70 px-4">
+                </div>
+
+                <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block">
+                        Password
+                    </label>
+                    <div className="flex items-center border border-foreground/10 bg-background px-4">
                         <input
                             className="w-full bg-transparent py-3 text-sm outline-none"
                             type={showPassword ? "text" : "password"}
                             autoComplete="current-password"
-                            placeholder=""
+                            placeholder="••••••••"
                             value={password}
                             onChange={(event) => setPassword(event.target.value)}
                         />
@@ -128,18 +130,17 @@ export default function LoginPage() {
                             className="p-2 text-muted-foreground transition hover:text-foreground"
                             type="button"
                             onClick={() => setShowPassword((prev) => !prev)}
-                            aria-label={showPassword ? "비밀번호 숨기기" : "비밀번호 표시"}
                         >
                             {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                         </button>
                     </div>
-                </label>
+                </div>
 
                 {message ? (
                     <div
-                        className={`rounded-2xl border px-4 py-3 text-sm ${message.type === "error"
-                            ? "border-red-500/40 bg-red-500/10 text-red-500"
-                            : "border-emerald-500/40 bg-emerald-500/10 text-emerald-600"
+                        className={`border px-4 py-3 text-[11px] font-bold uppercase tracking-tight ${message.type === "error"
+                            ? "border-destructive bg-destructive/10 text-destructive"
+                            : "border-foreground bg-foreground/10 text-foreground"
                             }`}
                     >
                         {message.text}
@@ -147,17 +148,26 @@ export default function LoginPage() {
                 ) : null}
 
                 <button
-                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="flex w-full items-center justify-center gap-2 bg-foreground px-4 py-3 text-xs font-black uppercase tracking-[0.2em] text-background transition hover:bg-foreground/90 disabled:opacity-50"
                     type="submit"
                     disabled={isSubmitting}
                 >
                     {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : null}
-                    로그인
+                    SIGN IN
                 </button>
 
-                <div className="grid gap-3 md:grid-cols-2">
+                <div className="relative py-4">
+                    <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-foreground/5"></div>
+                    </div>
+                    <div className="relative flex justify-center text-[10px] font-bold uppercase tracking-widest">
+                        <span className="bg-background px-2 text-muted-foreground">OR CONTINUE WITH</span>
+                    </div>
+                </div>
+
+                <div className="grid gap-2 grid-cols-2">
                     <button
-                        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                        className="flex w-full items-center justify-center gap-2 border border-foreground/10 px-4 py-3 text-xs font-bold uppercase tracking-widest text-foreground transition hover:bg-muted disabled:opacity-50"
                         type="button"
                         onClick={() => handleSocialSignup("google")}
                         disabled={Boolean(socialLoading) || isSubmitting}
@@ -166,7 +176,7 @@ export default function LoginPage() {
                         Google
                     </button>
                     <button
-                        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                        className="flex w-full items-center justify-center gap-2 border border-foreground/10 px-4 py-3 text-xs font-bold uppercase tracking-widest text-foreground transition hover:bg-muted disabled:opacity-50"
                         type="button"
                         onClick={() => handleSocialSignup("github")}
                         disabled={Boolean(socialLoading) || isSubmitting}
@@ -176,12 +186,24 @@ export default function LoginPage() {
                     </button>
                 </div>
             </form>
-            <p className="mt-6 text-center text-sm text-muted-foreground">
-                계정이 없으신가요?{" "}
-                <Link className="font-semibold text-primary underline-offset-4 hover:underline" href="/signup">
-                    회원가입하기
+            <p className="mt-8 text-center text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+                New here?{" "}
+                <Link className="text-foreground hover:underline" href="/signup">
+                    Create Account
                 </Link>
             </p>
         </div>
+    );
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-center p-20 border border-foreground/10 bg-background">
+                <Loader2 className="size-8 animate-spin text-muted-foreground" />
+            </div>
+        }>
+            <LoginForm />
+        </Suspense>
     );
 }

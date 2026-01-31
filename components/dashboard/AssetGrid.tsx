@@ -13,9 +13,9 @@ type AssetGridProps = {
 export function AssetGrid({ assets, selectedIds, onToggleSelect, uploadingProgress }: AssetGridProps) {
     if (assets.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center py-12 text-center border rounded-2xl border-dashed bg-muted/10">
-                <p className="text-muted-foreground">아직 업로드된 영상이 없습니다.</p>
-                <p className="text-sm text-muted-foreground/70">새 영상을 업로드해보세요.</p>
+            <div className="flex flex-col items-center justify-center py-10 text-center border border-dashed border-foreground/20 bg-muted/5">
+                <p className="text-xs font-bold uppercase tracking-tight text-muted-foreground">No assets found</p>
+                <p className="text-[10px] text-muted-foreground/70 mt-1">Upload a video to get started.</p>
             </div>
         );
     }

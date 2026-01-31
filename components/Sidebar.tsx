@@ -31,10 +31,10 @@ export function Sidebar({ projectId }: { projectId?: string }) {
                                 href={item.href}
                                 aria-current={isActive ? "page" : undefined}
                                 className={cn(
-                                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                                    "flex items-center gap-3 px-3 py-2.5 text-sm font-medium transition-colors border-l-2",
                                     isActive
-                                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                                        : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                                        ? "bg-muted text-foreground border-foreground"
+                                        : "text-muted-foreground border-transparent hover:bg-muted/50 hover:text-foreground"
                                 )}
                             >
                                 <Icon className="size-5 shrink-0" aria-hidden="true" />
@@ -49,7 +49,7 @@ export function Sidebar({ projectId }: { projectId?: string }) {
                     <Link
                         href={routes.settings.profile()}
                         className={cn(
-                            "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                            "flex items-center gap-3 px-3 py-2.5 text-sm font-medium transition-colors text-muted-foreground border-l-2 border-transparent hover:bg-muted/50 hover:text-foreground"
                         )}
                     >
                         <Settings className="size-5 shrink-0" aria-hidden="true" />

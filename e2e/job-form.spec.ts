@@ -28,7 +28,7 @@ test.describe("VideoInputPipeline", () => {
     // Mock API response
     const resolvedJobId = "job_e2e_123";
     await page.route("**/api/jobs", async (route, request) => {
-      const payload = (await request.postDataJSON()) as { url: string; autoStart: boolean };
+      const payload = (await request.postDataJSON()) as { url: string; autoStart: boolean; projectId: string };
       expect.soft(payload.url).toContain("storage.googleapis.com");
       expect(payload.autoStart).toBe(true);
 

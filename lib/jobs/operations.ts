@@ -511,16 +511,19 @@ export async function applySubtitlesToVideo(
 
   try {
     // Use Node.js Canvas Renderer (New Standard)
-    if (cues && cues.length > 0) {
+    // Render if we have cues OR if we need to change aspect ratio/resolution
+    const shouldRender = (cues && cues.length > 0) || (aspectRatio && aspectRatio !== 'original') || !!resolution;
+
+    if (shouldRender) {
       await renderSubtitleVideo(
         media.audioFile.replaceAll("\\", "/"),
         outputPath.replaceAll("\\", "/"),
-        cues,
+        cues || [], // Pass empty array if no cues
         subtitleConfig || { ...DEFAULT_SUBTITLE_CONFIG, fontName: 'Arial' },
         { jobId, resolution, aspectRatio }
       );
     } else {
-      console.warn(`[caption] No cues provided, skipping subtitle burn-in. Copying original video.`);
+      console.warn(`[caption] No cues and no format changes requested. Copying original video.`);
       await fs.copyFile(media.audioFile, outputPath);
     }
 

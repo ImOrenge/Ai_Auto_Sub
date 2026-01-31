@@ -20,14 +20,13 @@ export function StudioTopBar({
     onNewQueueClick,
 }: StudioTopBarProps) {
     return (
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 dark:border-gray-800 pb-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-foreground/10 pb-3">
             <div className="space-y-1">
                 <div className="flex items-center gap-3">
-                    <h1 className="text-xl font-bold tracking-tight">Studio</h1>
+                    <h1 className="text-xl font-black uppercase tracking-tighter">Studio</h1>
                     <ProjectSwitcher
                         projects={allProjects}
                         selectedProjectId={project.id}
-                    // Default navigation is fine, but if we wanted to block navigation we could pass handler
                     />
                 </div>
                 {/* 
@@ -46,18 +45,18 @@ export function StudioTopBar({
                 <Button
                     variant="outline"
                     size="sm"
-                    className="gap-2"
+                    className="gap-2 font-bold uppercase tracking-widest text-[10px]"
                     onClick={onNewQueueClick}
                 >
-                    <Plus className="size-4" />
+                    <Plus className="size-3" />
                     New Queue
                 </Button>
                 <Button
                     size="sm"
-                    className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                    className="gap-2 font-bold uppercase tracking-widest text-[10px]"
                     onClick={onUploadClick}
                 >
-                    <Upload className="size-4" />
+                    <Upload className="size-3" />
                     Upload
                 </Button>
             </div>

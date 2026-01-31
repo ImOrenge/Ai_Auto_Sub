@@ -23,9 +23,11 @@ type JobRow = {
   caption_source: CaptionData | null;
   caption_edit: CaptionData | null;
   edited_at: string | null;
+  cuts?: unknown | null;
+  sequence?: unknown | null;
   created_at: string;
   updated_at: string;
-  assets?: { filename: string; storage_key: string } | null;
+  assets?: { filename: string; storage_key: string | null; source_url: string | null } | null;
 };
 
 function mapRowToRecord(row: JobRow): JobRecord {
@@ -47,11 +49,15 @@ function mapRowToRecord(row: JobRow): JobRecord {
     captionSource: row.caption_source,
     captionEdit: row.caption_edit,
     editedAt: row.edited_at,
+    cuts: (row.cuts as JobRecord["cuts"]) ?? null,
+    sequence: (row.sequence as JobRecord["sequence"]) ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     asset: row.assets ? {
       filename: row.assets.filename,
-      storageKey: row.assets.storage_key,
+      storageKey: row.assets?.storage_key ?? undefined,
+      thumbnailUrl: (row.assets as any)?.thumbnail_url,
+      sourceUrl: row.assets?.source_url ?? undefined,
     } : null,
   };
 }
@@ -60,7 +66,8 @@ export async function insertJobRecord(input: JobCreateInput): Promise<JobRecord>
   const supabase = getSupabaseServer();
   const row = {
     user_id: input.userId ?? null,
-    // project_id: input.projectId ?? null, // Need to update JobCreateInput if we want to save it
+    project_id: input.projectId ?? null,
+    asset_id: input.assetId ?? null,
     url: input.url,
     source_type: input.sourceType ?? classifySourceType(input.url),
     status: "pending",
@@ -83,7 +90,7 @@ export async function insertJobRecord(input: JobCreateInput): Promise<JobRecord>
 
 export async function selectJobById(id: string): Promise<JobRecord | null> {
   const supabase = getSupabaseServer();
-  const { data, error } = await supabase.from(TABLE).select("*, assets(filename, storage_key)").eq("id", id).maybeSingle();
+  const { data, error } = await supabase.from(TABLE).select("*, assets(filename, storage_key, source_url)").eq("id", id).maybeSingle();
 
   if (error) {
     throw new Error(`Unable to fetch job ${id}: ${error.message}`);
@@ -97,7 +104,7 @@ export async function selectJobs(limit = 20): Promise<JobRecord[]> {
   const normalizedLimit = Number.isFinite(limit) && limit > 0 ? Math.min(Math.floor(limit), 100) : 20;
   const { data, error } = await supabase
     .from(TABLE)
-    .select("*, assets(filename, storage_key)")
+    .select("*, assets(filename, storage_key, source_url)")
     .order("created_at", { ascending: false })
     .limit(normalizedLimit);
 
@@ -124,7 +131,7 @@ export async function updateJobById(id: string, patch: JobUpdateInput): Promise<
     .from(TABLE)
     .update(updatePayload)
     .eq("id", id)
-    .select()
+    .select("*, assets(filename, storage_key, source_url)")
     .single();
 
   if (error || !data) {
@@ -171,6 +178,12 @@ function mapUpdateToRow(update: JobUpdateInput): Partial<JobRow> {
   }
   if ("editedAt" in update) {
     payload.edited_at = update.editedAt ?? null;
+  }
+  if ("cuts" in update) {
+    payload.cuts = update.cuts ?? null;
+  }
+  if ("sequence" in update) {
+    payload.sequence = update.sequence ?? null;
   }
 
   return payload;

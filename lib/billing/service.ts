@@ -13,7 +13,7 @@ import { getSupabaseServer } from "../supabaseServer";
 import { env } from "../env";
 
 // Default fallback limits if DB fetch fails or for Free tier if no record exists
-const DEFAULT_FREE_LIMITS: PlanLimits = { sttMinutes: 30, translationLanguages: 0, concurrentJobs: 1, storageDays: 3 };
+const DEFAULT_FREE_LIMITS: PlanLimits = { sttMinutes: 30, translationLanguages: 0, concurrentJobs: 100, storageDays: 3, maxProjects: 3 };
 const DEFAULT_FREE_FEATURES: PlanFeatures = { priority: false, apiAccess: false, watermark: true };
 
 export class BillingService {
@@ -96,6 +96,7 @@ export class BillingService {
 
   // Calculate Entitlements (Active Plan + Usage)
   static async getEntitlements(userId: string = MOCK_USER_ID): Promise<EntitlementSummary> {
+    const supabase = getSupabaseServer();
     const subscription = await this.getSubscription(userId);
     const planConfig = await this.getPlanConfig(subscription.planId);
     
@@ -109,12 +110,18 @@ export class BillingService {
       .filter(l => l.metric === "stt_minutes" && l.status === "posted")
       .reduce((acc, curr) => acc + curr.quantity, 0);
 
-    // Count active jobs (any status that is not terminal)
-    const { count: activeCount } = await getSupabaseServer()
+    // Count active jobs (any status that is actually using processing resources)
+    const { count: activeCount } = await supabase
       .from('jobs')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userId)
-      .not('status', 'in', '("done","error","canceled")');
+      .not('status', 'in', '("done","error","canceled","awaiting_edit","editing","ready_to_export")');
+
+    // Count projects
+    const { count: projectCount } = await supabase
+      .from('projects')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
 
     return {
       planName: planConfig.name,
@@ -130,6 +137,10 @@ export class BillingService {
       jobs: {
         concurrentLimit: planConfig.limits.concurrentJobs,
         activeCount: activeCount || 0
+      },
+      projects: {
+        maxLimit: planConfig.limits.maxProjects,
+        currentCount: projectCount || 0
       },
       features: {
         canRemoveWatermark: !planConfig.features.watermark,

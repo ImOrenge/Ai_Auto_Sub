@@ -1,19 +1,26 @@
 steps:
-  # Build the container image
+  # Build the container image with caching
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
+      - '--cache-from'
+      - 'gcr.io/$PROJECT_ID/ai-sub-auto:latest'
+      - '--build-arg'
+      - 'BUILDKIT_INLINE_CACHE=1'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/ai-sub-auto:$COMMIT_SHA'
+      - 'gcr.io/$PROJECT_ID/ai-sub-auto:${_TAG}'
       - '-t'
       - 'gcr.io/$PROJECT_ID/ai-sub-auto:latest'
       - '.'
+    timeout: '1200s'
 
-  # Push the container image to Container Registry
+  # Push the container image
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - 'gcr.io/$PROJECT_ID/ai-sub-auto:$COMMIT_SHA'
+      - '--all-tags'
+      - 'gcr.io/$PROJECT_ID/ai-sub-auto'
+    timeout: '600s'
 
   # Deploy to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -23,29 +30,38 @@ steps:
       - 'deploy'
       - 'ai-sub-auto'
       - '--image'
-      - 'gcr.io/$PROJECT_ID/ai-sub-auto:$COMMIT_SHA'
+      - 'gcr.io/$PROJECT_ID/ai-sub-auto:${_TAG}'
       - '--region'
-      - 'asia-northeast3'  # Seoul region (or use your preferred region)
+      - 'asia-northeast3'
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
       - '--memory'
-      - '4Gi'  # Video rendering needs memory
+      - '32Gi'
       - '--cpu'
-      - '4'    # More CPU for faster rendering
+      - '8'
       - '--timeout'
-      - '3600' # 60 minutes for long renders
+      - '3600'
       - '--max-instances'
       - '10'
       - '--min-instances'
-      - '0'    # Scale to zero when idle
+      - '0'
+      - '--set-env-vars'
+      - 'NODE_ENV=production,NEXT_TELEMETRY_DISABLED=1,NEXT_PUBLIC_SUPABASE_URL=https://jzoklqdfjqeshonnkywr.supabase.co,NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp6b2tscWRmanFlc2hvbm5reXdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzNjI1NTUsImV4cCI6MjA4MDkzODU1NX0.uDu3u90ohyxOXgcv9bOI5MhKuby8tap1z3tM0XxHwoM,SUPABASE_JOBS_TABLE=jobs,SUPABASE_RESULTS_BUCKET=results,SUPABASE_UPLOADS_BUCKET=uploads,WHISPER_MODEL=whisper-1,TRANSLATION_PROVIDER=openai,TRANSLATION_MODEL=gpt-4o-mini'
+      - '--set-secrets'
+      - 'OPENAI_API_KEY=OPENAI_API_KEY:latest,SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest,YOUTUBE_COOKIE=YOUTUBE_COOKIE:latest'
+    timeout: '600s'
 
 images:
-  - 'gcr.io/$PROJECT_ID/ai-sub-auto:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/ai-sub-auto:${_TAG}'
   - 'gcr.io/$PROJECT_ID/ai-sub-auto:latest'
 
-options:
-  machineType: 'E2_HIGHCPU_8'  # Faster builds
-  logging: CLOUD_LOGGING_ONLY
+substitutions:
+  _TAG: latest
 
-timeout: '1800s'  # 30 minutes for build
+options:
+  machineType: 'E2_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+  dynamicSubstitutions: true
+
+timeout: '2400s'

@@ -51,9 +51,11 @@ test_result.log
 tmp
 temp
 test-output
-test-*.mp4
-test-*.png
-dummy_input.mp4
+*.mp4
+*.mov
+*-player-script.js
+*.png
+!test-poc.png
 
 # Documentation
 README.md

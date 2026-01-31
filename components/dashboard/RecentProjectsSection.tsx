@@ -28,11 +28,11 @@ export function RecentProjectsSection({ projects }: RecentProjectsSectionProps) 
                 {projects.slice(0, 8).map((project) => (
                     <Link
                         key={project.id}
-                        href={routes.studio(project.id)}
-                        className="group flex flex-col p-4 rounded-xl border bg-card hover:border-primary/50 hover:shadow transition relative"
+                        href={routes.project(project.id)}
+                        className="group flex flex-col p-4 rounded-none border bg-card hover:border-primary/50 hover:shadow transition relative"
                     >
                         <div className="flex justify-between items-start mb-3">
-                            <div className="size-10 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-500 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                            <div className="size-10 rounded-none bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-500 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
                                 <Folder className="size-5" />
                             </div>
                             {/* Option for menu */}

@@ -23,7 +23,7 @@ export function AppShell({ children, isAuthenticated }: AppShellProps) {
                     <div className="flex items-center gap-4">
                         <Link className="flex items-center gap-2 font-semibold tracking-tight" href="/dashboard">
                             <span className="text-lg">AutoSubAI</span>
-                            <span className="hidden rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary sm:inline">
+                            <span className="hidden bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary sm:inline">
                                 콘솔
                             </span>
                         </Link>
@@ -32,7 +32,7 @@ export function AppShell({ children, isAuthenticated }: AppShellProps) {
                     <nav className="flex items-center gap-3 text-sm">
                         <LogoutButton isAuthenticated={isAuthenticated} />
                         <Link
-                            className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                            className="inline-flex items-center gap-1.5 border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground"
                             href="https://supabase.com/docs"
                             target="_blank"
                             rel="noreferrer"

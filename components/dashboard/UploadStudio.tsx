@@ -69,48 +69,48 @@ export function UploadStudio({ onUploadStart, onOpenDrafts, onCreateQueue, onUrl
                 onDrop={handleDrop}
                 className={`
           relative flex flex-col items-center justify-center 
-          min-h-[300px] md:min-h-[400px] w-full rounded-3xl 
-          border-2 border-dashed transition-all duration-200
+          min-h-[250px] md:min-h-[300px] w-full 
+          border border-dashed transition-all duration-200
           ${isDragging
-                        ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-900/10'
-                        : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50'
+                        ? 'border-foreground bg-muted'
+                        : 'border-foreground/20 hover:border-foreground/40 bg-background'
                     }
         `}
             >
                 <div className="flex flex-col items-center text-center space-y-4 max-w-md p-6">
                     <div className={`
-            p-4 rounded-full mb-2 transition-transform duration-300
-            ${isDragging ? 'scale-110 bg-blue-100 text-blue-600' : 'bg-white dark:bg-gray-800 text-gray-400 shadow-sm'}
+            p-3 mb-2 transition-transform duration-300
+            ${isDragging ? 'scale-110 bg-foreground text-background' : 'bg-muted text-muted-foreground'}
           `}>
-                        <Upload className="size-8 md:size-10" />
+                        <Upload className="size-6 md:size-8" />
                     </div>
 
                     {!showUrlInput ? (
                         <>
-                            <div className="space-y-2">
-                                <h3 className="text-xl md:text-2xl font-semibold text-gray-900 dark:text-gray-100">
-                                    첫 영상을 올려 작업을 시작하세요
+                            <div className="space-y-1">
+                                <h3 className="text-lg md:text-xl font-bold uppercase tracking-tight text-foreground">
+                                    Upload Video To Start
                                 </h3>
-                                <p className="text-sm md:text-base text-gray-500 max-w-sm mx-auto leading-relaxed">
-                                    여러 영상을 한 번에 업로드하고,<br className="hidden md:block" />
-                                    선택해서 큐에 담아 일괄 처리할 수 있어요.
+                                <p className="text-[10px] md:text-xs text-muted-foreground max-w-sm mx-auto uppercase font-medium">
+                                    Drop files here or use the buttons below.<br className="hidden md:block" />
+                                    Multi-upload and batch processing supported.
                                 </p>
                             </div>
 
-                            <div className="flex flex-col sm:flex-row gap-3 w-full pt-4">
+                            <div className="flex flex-col sm:flex-row gap-2 w-full pt-4">
                                 <button
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors shadow-lg shadow-blue-600/20"
+                                    className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-2 bg-foreground text-background font-bold text-xs uppercase tracking-widest transition-colors"
                                 >
-                                    <FileVideo className="size-5" />
-                                    파일 선택
+                                    <FileVideo className="size-4" />
+                                    Select Files
                                 </button>
                                 <button
                                     onClick={() => setShowUrlInput(true)}
-                                    className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 font-medium transition-colors"
+                                    className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-2 border border-foreground/20 hover:bg-muted font-bold text-xs uppercase tracking-widest transition-colors"
                                 >
-                                    <Plus className="size-5 text-blue-500" />
-                                    URL 추가
+                                    <Plus className="size-4" />
+                                    Add URL
                                 </button>
                             </div>
                         </>
@@ -138,16 +138,16 @@ export function UploadStudio({ onUploadStart, onOpenDrafts, onCreateQueue, onUrl
                                     <button
                                         type="button"
                                         onClick={() => setShowUrlInput(false)}
-                                        className="flex-1 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                                        className="flex-1 px-4 py-2 border border-foreground/20 text-[10px] font-bold uppercase tracking-widest hover:bg-muted transition-colors"
                                     >
-                                        취소
+                                        Cancel
                                     </button>
                                     <button
                                         type="submit"
                                         disabled={isResolving || !url}
-                                        className="flex-[2] px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                                        className="flex-[2] px-4 py-2 bg-foreground text-background text-[10px] font-bold uppercase tracking-widest disabled:opacity-50 transition-colors"
                                     >
-                                        {isResolving ? '확인 중...' : '영상 추가하기'}
+                                        {isResolving ? 'Resolving...' : 'Add Video'}
                                     </button>
                                 </div>
                             </form>
@@ -175,56 +175,55 @@ export function UploadStudio({ onUploadStart, onOpenDrafts, onCreateQueue, onUrl
             </div>
 
             {/* Quick Actions & Guide */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* Step Guide - Only visible on desktop/large screens maybe? Keeping consistent for now */}
-                <div className="hidden lg:flex items-center justify-between p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 text-sm md:col-span-1">
-                    <div className="flex items-center gap-3">
-                        <span className="size-6 flex items-center justify-center rounded-full bg-blue-100 text-blue-600 font-bold text-xs">1</span>
-                        <span className="text-gray-600 dark:text-gray-400">업로드</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {/* Step Guide */}
+                <div className="hidden lg:flex items-center justify-between p-3 bg-background border border-foreground/10 text-[10px] font-bold uppercase tracking-widest md:col-span-1">
+                    <div className="flex items-center gap-2">
+                        <span className="size-5 flex items-center justify-center bg-foreground text-background font-bold">1</span>
+                        <span className="text-foreground">Upload</span>
                     </div>
-                    <div className="h-px w-8 bg-gray-200"></div>
-                    <div className="flex items-center gap-3">
-                        <span className="size-6 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 font-bold text-xs">2</span>
-                        <span className="text-gray-600 dark:text-gray-400">선택</span>
+                    <div className="h-px w-6 bg-foreground/10"></div>
+                    <div className="flex items-center gap-2">
+                        <span className="size-5 flex items-center justify-center bg-muted text-muted-foreground font-bold">2</span>
+                        <span className="text-muted-foreground">Select</span>
                     </div>
-                    <div className="h-px w-8 bg-gray-200"></div>
-                    <div className="flex items-center gap-3">
-                        <span className="size-6 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 font-bold text-xs">3</span>
-                        <span className="text-gray-600 dark:text-gray-400">큐 실행</span>
+                    <div className="h-px w-6 bg-foreground/10"></div>
+                    <div className="flex items-center gap-2">
+                        <span className="size-5 flex items-center justify-center bg-muted text-muted-foreground font-bold">3</span>
+                        <span className="text-muted-foreground">Queue</span>
                     </div>
                 </div>
 
                 {/* Quick Actions */}
-                <div className="md:col-span-2 lg:col-span-2 grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="md:col-span-2 lg:col-span-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
                     <button
                         onClick={onCreateQueue}
-                        className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 hover:border-blue-200 dark:hover:border-blue-800 hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-all group"
+                        className="flex flex-col items-center justify-center gap-2 p-3 bg-background border border-foreground/10 hover:border-foreground transition-all group"
                     >
-                        <div className="p-2 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 group-hover:scale-110 transition-transform">
-                            <Plus className="size-5" />
+                        <div className="p-2 bg-muted text-foreground group-hover:scale-110 transition-transform">
+                            <Plus className="size-4" />
                         </div>
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">새 큐 만들기</span>
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-foreground">New Queue</span>
                     </button>
 
                     <button
                         onClick={onOpenDrafts}
-                        className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 hover:border-purple-200 dark:hover:border-purple-800 hover:bg-purple-50/50 dark:hover:bg-purple-900/20 transition-all group"
+                        className="flex flex-col items-center justify-center gap-2 p-3 bg-background border border-foreground/10 hover:border-foreground transition-all group"
                     >
-                        <div className="p-2 rounded-full bg-purple-100 dark:bg-purple-900/50 text-purple-600 group-hover:scale-110 transition-transform">
-                            <BookOpen className="size-5" />
+                        <div className="p-2 bg-muted text-foreground group-hover:scale-110 transition-transform">
+                            <BookOpen className="size-4" />
                         </div>
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">드래프트 큐</span>
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-foreground">Drafts</span>
                     </button>
 
-                    {/* Placeholder for Glossaries or Config */}
                     <button
                         onClick={() => { }}
-                        className="hidden sm:flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 hover:border-gray-300 hover:bg-gray-50/50 transition-all group"
+                        className="hidden sm:flex flex-col items-center justify-center gap-2 p-3 bg-background border border-foreground/10 hover:border-foreground transition-all group"
                     >
-                        <div className="p-2 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 group-hover:scale-110 transition-transform">
-                            <Zap className="size-5" />
+                        <div className="p-2 bg-muted text-foreground group-hover:scale-110 transition-transform">
+                            <Zap className="size-4" />
                         </div>
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">설정 가져오기</span>
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-foreground">Settings</span>
                     </button>
                 </div>
             </div>

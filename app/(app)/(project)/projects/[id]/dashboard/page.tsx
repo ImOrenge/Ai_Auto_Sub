@@ -11,7 +11,7 @@ export default function ProjectDashboardRedirect() {
 
     useEffect(() => {
         if (projectId) {
-            router.replace(routes.studio(projectId));
+            router.replace(routes.projectEditor(projectId));
         }
     }, [projectId, router]);
 

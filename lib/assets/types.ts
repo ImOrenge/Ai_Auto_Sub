@@ -37,6 +37,7 @@ export type CreateAssetParams = {
 };
 
 export type UpdateAssetParams = {
+  filename?: string;
   status?: AssetStatus;
   transcriptionStatus?: TranscriptionStatus;
   meta?: AssetMeta;

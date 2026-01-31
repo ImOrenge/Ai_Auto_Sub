@@ -1,6 +1,7 @@
 import { MainEditor } from "@/components/editor/MainEditor";
 import { EditorProvider } from "@/components/editor/EditorContext";
 import { createClient } from "@/lib/supabase/server";
+import { getProjectById } from "@/lib/projects/repository";
 import { listAssets } from "@/lib/assets/repository";
 import { notFound } from "next/navigation";
 
@@ -16,6 +17,10 @@ export default async function ProjectEditorPage({ params }: ProjectEditorPagePro
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return notFound();
 
+    // Fetch project details
+    const project = await getProjectById(supabase, projectId);
+    if (!project) return notFound();
+
     // Fetch initial assets for the project
     const { assets } = await listAssets(supabase, user.id, projectId, 50);
 
@@ -24,6 +29,7 @@ export default async function ProjectEditorPage({ params }: ProjectEditorPagePro
             <EditorProvider>
                 <MainEditor
                     projectId={projectId}
+                    project={project}
                     initialAssets={assets}
                 />
             </EditorProvider>

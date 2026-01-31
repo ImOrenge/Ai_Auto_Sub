@@ -7,14 +7,19 @@ import { cn } from "@/lib/utils";
 import { SubtitleConfigForm } from "@/components/SubtitleConfigForm";
 import type { SubtitleConfig } from "@/lib/jobs/types";
 import { DEFAULT_SUBTITLE_CONFIG } from "@/lib/jobs/types";
+import { uploadFileToSignedUrl } from "@/lib/uploadClient";
 
-type UploadJobResponse = {
+type UploadSessionResponse = {
+  asset: {
+    id: string;
+  };
+  signedUrl: string;
+};
+
+type JobCreationResponse = {
   job: {
     id: string;
     url: string;
-  };
-  upload: {
-    publicUrl: string;
   };
 };
 
@@ -31,7 +36,6 @@ export function UploadForm() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
-  const [uploadUrl, setUploadUrl] = useState<string | null>(null);
   const [inputKey, setInputKey] = useState(0);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -39,7 +43,6 @@ export function UploadForm() {
     setError(null);
     setSuccess(null);
     setJobId(null);
-    setUploadUrl(null);
 
     if (!file) {
       setError("업로드할 동영상 파일을 선택해주세요.");
@@ -48,24 +51,52 @@ export function UploadForm() {
 
     setIsSubmitting(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("autoStart", autoStart ? "true" : "false");
-      formData.append("subtitleConfig", JSON.stringify(subtitleConfig));
-
-      const response = await fetch("/api/uploads", {
+      const sessionResponse = await fetch("/api/uploads/session", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          filename: file.name,
+          sizeBytes: file.size,
+          mimeType: file.type || "application/octet-stream",
+        }),
       });
-      const payload = (await response.json()) as UploadJobResponse & ErrorResponse;
+      const sessionPayload = (await sessionResponse.json()) as UploadSessionResponse & ErrorResponse;
 
-      if (!response.ok) {
-        throw new Error(payload.error ?? "업로드를 처리할 수 없습니다.");
+      if (!sessionResponse.ok) {
+        throw new Error(sessionPayload.error ?? "Upload request failed.");
       }
 
-      setJobId(payload.job.id);
-      setUploadUrl(payload.upload.publicUrl);
-      setSuccess("업로드가 완료되었어요. 파이프라인을 확인해보세요!");
+      await uploadFileToSignedUrl(file, sessionPayload.signedUrl);
+
+      const completeResponse = await fetch("/api/uploads/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assetId: sessionPayload.asset.id }),
+      });
+      const completePayload = (await completeResponse.json()) as ErrorResponse;
+
+      if (!completeResponse.ok) {
+        throw new Error(completePayload.error ?? "Upload completion failed.");
+      }
+
+      const jobResponse = await fetch("/api/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          assetId: sessionPayload.asset.id,
+          autoStart,
+          subtitleConfig,
+          sourceType: "upload",
+        }),
+      });
+      const jobPayload = (await jobResponse.json()) as JobCreationResponse & ErrorResponse;
+
+      if (!jobResponse.ok) {
+        throw new Error(jobPayload.error ?? "Job creation failed.");
+      }
+
+      setJobId(jobPayload.job.id);
+      setSuccess("Upload complete. Check the pipeline status.");
       setFile(null);
       setInputKey((value) => value + 1);
     } catch (uploadError) {
@@ -190,19 +221,6 @@ export function UploadForm() {
             <CheckCircle2 className="size-4" />
             <p className="font-semibold">{success}</p>
           </div>
-          {uploadUrl ? (
-            <p className="text-xs text-muted-foreground">
-              업로드된 파일:{" "}
-              <a
-                className="text-primary underline-offset-4 hover:underline"
-                href={uploadUrl}
-                rel="noreferrer"
-                target="_blank"
-              >
-                {uploadUrl}
-              </a>
-            </p>
-          ) : null}
           <Link
             className="inline-flex items-center gap-2 text-primary underline-offset-4 hover:underline"
             href={`/jobs/${jobId}`}

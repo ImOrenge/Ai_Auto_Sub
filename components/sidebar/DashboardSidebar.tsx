@@ -5,10 +5,12 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { buildDashboardNav, routes } from "@/lib/routes";
 import { LayoutDashboard, Folder, LineChart, Code, Settings } from "lucide-react";
+import { useSidebar } from "../SidebarContext";
 
 export function DashboardSidebar() {
     const pathname = usePathname();
     const navItems = buildDashboardNav();
+    const { isCollapsed } = useSidebar();
 
     const icons = {
         dashboard: LayoutDashboard,
@@ -18,11 +20,23 @@ export function DashboardSidebar() {
     };
 
     return (
-        <aside className="hidden md:flex md:w-60 md:flex-col md:fixed md:inset-y-0 md:top-[65px] md:border-r md:bg-sidebar">
-            <div className="flex px-4 py-3 border-b border-sidebar-border/50">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Global Workspace
-                </span>
+        <aside
+            className={cn(
+                "hidden md:flex md:flex-col md:fixed md:inset-y-0 md:top-[65px] md:border-r md:bg-sidebar transition-all duration-300 ease-in-out z-40",
+                isCollapsed ? "md:w-16" : "md:w-60"
+            )}
+        >
+            <div className={cn(
+                "flex px-4 py-3 border-b border-sidebar-border/50 overflow-hidden whitespace-nowrap",
+                isCollapsed ? "justify-center px-0" : "px-4"
+            )}>
+                {isCollapsed ? (
+                    <span className="text-[10px] font-bold text-primary">WS</span>
+                ) : (
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        Global Workspace
+                    </span>
+                )}
             </div>
             <div className="flex flex-1 flex-col gap-1 overflow-y-auto p-4">
                 <nav className="flex flex-1 flex-col gap-1" aria-label="Dashboard navigation">
@@ -36,14 +50,16 @@ export function DashboardSidebar() {
                                 href={item.href}
                                 aria-current={isActive ? "page" : undefined}
                                 className={cn(
-                                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                                    "flex items-center gap-3 rounded-lg py-2.5 text-sm font-medium transition-all duration-300 overflow-hidden whitespace-nowrap",
+                                    isCollapsed ? "px-2 justify-center" : "px-3",
                                     isActive
                                         ? "bg-sidebar-accent text-sidebar-accent-foreground"
                                         : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
                                 )}
+                                title={isCollapsed ? item.label : undefined}
                             >
                                 <Icon className="size-5 shrink-0" aria-hidden="true" />
-                                {item.label}
+                                {!isCollapsed && <span>{item.label}</span>}
                             </Link>
                         );
                     })}
@@ -54,12 +70,14 @@ export function DashboardSidebar() {
                     <Link
                         href={routes.settings.profile()}
                         className={cn(
-                            "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground",
+                            "flex items-center gap-3 rounded-lg py-2.5 text-sm font-medium transition-all duration-300 overflow-hidden whitespace-nowrap text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground",
+                            isCollapsed ? "px-2 justify-center" : "px-3",
                             pathname.startsWith("/settings") && "bg-sidebar-accent text-sidebar-accent-foreground"
                         )}
+                        title={isCollapsed ? "Settings" : undefined}
                     >
                         <Settings className="size-5 shrink-0" aria-hidden="true" />
-                        Settings
+                        {!isCollapsed && <span>Settings</span>}
                     </Link>
                 </div>
             </div>

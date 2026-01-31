@@ -6,6 +6,7 @@ import {
   translateSegments, 
   generateSrt, 
   generateBilingualSrt,
+  uploadToStorage,
 } from "@/lib/jobs/operations";
 import { parseSrt } from "@/lib/subtitle/srt";
 import { DEFAULT_SUBTITLE_CONFIG, SubtitleConfig, CaptionData } from "@/lib/jobs/types";
@@ -53,7 +54,10 @@ export async function transcribeAsset(supabase: SupabaseClient, assetId: string,
       subtitles = await generateBilingualSrt(transcription, translation);
     }
 
-    // 6. Parse SRT to CaptionData for Editor
+    // 6. Upload SRT to Storage
+    const uploadResult = await uploadToStorage(subtitles);
+
+    // 7. Parse SRT to CaptionData for Editor
     const cues = parseSrt(subtitles.content);
     
     // Add original text if available
@@ -67,7 +71,7 @@ export async function transcribeAsset(supabase: SupabaseClient, assetId: string,
       defaultStyle: subtitleConfig,
     };
 
-    // 7. Update Asset
+    // 8. Update Asset
     await updateAsset(supabase, assetId, {
       transcriptionStatus: 'completed',
       captions: captionData,
@@ -75,7 +79,8 @@ export async function transcribeAsset(supabase: SupabaseClient, assetId: string,
         ...asset.meta,
         duration: audio.durationMs / 1000,
         size: audio.sizeBytes,
-        mimeType: audio.mimeType || undefined
+        mimeType: audio.mimeType || undefined,
+        resultSrtUrl: uploadResult.publicUrl
       }
     });
 
