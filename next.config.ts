@@ -4,6 +4,7 @@ const distDir = process.env.NEXT_DIST_DIR;
 
 const nextConfig: NextConfig = {
   ...(distDir ? { distDir } : {}),
+  output: 'standalone', // Optimized for Docker deployment
   serverExternalPackages: ["@napi-rs/canvas"],
   typescript: {
     // Skip type checking during build - type check separately via IDE/CI
