@@ -2,46 +2,93 @@ import { NextResponse } from "next/server";
 import { processJob } from "@/lib/jobs/processJob";
 import { createJob, listJobs } from "@/lib/jobs/service";
 import { selectJobsWithFilters, countJobsByStatus } from "@/lib/jobs/repository";
+import { getAssetById } from "@/lib/assets/repository";
+import { getSupabaseServer } from "@/lib/supabaseServer";
 import { MOCK_USER_ID } from "@/lib/utils";
+import { classifySourceType, DEFAULT_SUBTITLE_CONFIG } from "@/lib/jobs/types";
 import type { SubtitleConfig, SourceType, JobStatus, JobRecord } from "@/lib/jobs/types";
-import { BillingService } from "@/lib/billing/service"; // Import BillingService
+import { BillingService } from "@/lib/billing/service";
+import { CreateJobSchema, GetJobsQuerySchema } from "@/lib/validators/jobs";
 
 type CreateJobBody = {
   url?: string;
+  assetId?: string | null;
   userId?: string | null;
+  projectId?: string | null;
   autoStart?: boolean;
   subtitleConfig?: SubtitleConfig;
   sourceType?: SourceType;
 };
 
 export async function POST(request: Request) {
-  let body: CreateJobBody;
+  let body;
   try {
-    body = (await request.json()) as CreateJobBody;
+    body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { url, userId = null, autoStart = true, subtitleConfig, sourceType } = body;
-
-  if (!url || typeof url !== "string") {
-    return NextResponse.json({ error: "url is required" }, { status: 400 });
+  // Zod Validation
+  const validation = CreateJobSchema.safeParse(body);
+  if (!validation.success) {
+    return NextResponse.json(
+      { error: "Validation Error", details: validation.error.flatten() },
+      { status: 400 }
+    );
   }
 
+  const {
+    url,
+    assetId,
+    userId = null,
+    projectId = null,
+    autoStart = true,
+    subtitleConfig,
+    sourceType,
+  } = validation.data;
+
   try {
-    const effectiveUserId = userId || MOCK_USER_ID;
+    if (!projectId) {
+      return NextResponse.json({ error: "projectId is required" }, { status: 400 });
+    }
+
+    let effectiveUserId = userId || MOCK_USER_ID;
+    let resolvedUrl = url ?? null;
+    let resolvedSourceType = sourceType;
+    let resolvedProjectId = projectId;
+
+    if (!resolvedUrl && assetId) {
+      const supabase = getSupabaseServer();
+      const asset = await getAssetById(supabase, assetId);
+      if (!asset) {
+        return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+      }
+
+      if (!userId && asset.userId) {
+        effectiveUserId = asset.userId;
+      }
+      resolvedProjectId = resolvedProjectId ?? asset.projectId ?? null;
+      resolvedUrl = asset.sourceUrl ?? asset.filename ?? `asset-${assetId}`;
+      if (!resolvedSourceType) {
+        resolvedSourceType = asset.sourceUrl ? classifySourceType(asset.sourceUrl) : "upload";
+      }
+    }
+
+    if (!resolvedUrl) {
+      return NextResponse.json({ error: "url is required" }, { status: 400 });
+    }
 
     // 1. Check Quotas
     const entitlements = await BillingService.getEntitlements(effectiveUserId);
     
     // Concurrent Jobs Check
-    if (entitlements.jobs.activeCount >= entitlements.jobs.concurrentLimit) {
+    if (autoStart && entitlements.jobs.activeCount >= entitlements.jobs.concurrentLimit) {
       return NextResponse.json({ 
         error: `Concurrent job limit reached (${entitlements.jobs.activeCount}/${entitlements.jobs.concurrentLimit}). Please wait or upgrade.` 
       }, { status: 429 });
     }
 
-    // Usage Limit Check (Block Free tier only)
+    // Usage Limit Check
     const sub = await BillingService.getSubscription(effectiveUserId);
     if (sub.planId === "free" && entitlements.stt.isOverLimit) {
        return NextResponse.json({
@@ -50,10 +97,12 @@ export async function POST(request: Request) {
     }
 
     const job = await createJob({
-      url,
+      url: resolvedUrl,
+      assetId: assetId ?? null,
       userId: effectiveUserId,
-      sourceType,
-      subtitleConfig,
+      projectId: resolvedProjectId ?? null,
+      sourceType: resolvedSourceType,
+      subtitleConfig: subtitleConfig ? { ...DEFAULT_SUBTITLE_CONFIG, ...subtitleConfig } : null,
     });
 
     if (autoStart) {
@@ -71,9 +120,32 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
+  const paramsObj = Object.fromEntries(searchParams.entries());
+
+  // Zod Validation for Query Params
+  const validation = GetJobsQuerySchema.safeParse(paramsObj);
+  
+  if (!validation.success) {
+     return NextResponse.json(
+       { error: "Invalid Query Parameters", details: validation.error.flatten() },
+       { status: 400 }
+     );
+  }
+
+  const { 
+      counts: countsParam, 
+      status: statusParam, 
+      search, 
+      startDate, 
+      endDate, 
+      page, 
+      limit, 
+      projectId, 
+      queueId 
+  } = validation.data;
 
   // Check if this is a counts-only request
-  const countsOnly = searchParams.get("counts") === "true";
+  const countsOnly = countsParam === "true";
 
   if (countsOnly) {
     try {
@@ -85,21 +157,6 @@ export async function GET(request: Request) {
     }
   }
 
-  // Parse filter parameters
-  const statusParam = searchParams.get("status") as JobStatus | null;
-  const search = searchParams.get("search");
-  const startDate = searchParams.get("startDate");
-  const endDate = searchParams.get("endDate");
-  const pageParam = Number(searchParams.get("page") ?? "1");
-  const limitParam = Number(searchParams.get("limit") ?? "20");
-  const projectId = searchParams.get("projectId");
-  const queueId = searchParams.get("queueId"); // NEW
-
-  // Validate pagination
-  const page = Number.isFinite(pageParam) && pageParam > 0 ? Math.floor(pageParam) : 1;
-  const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(Math.floor(limitParam), 100) : 20;
-
-  // Check if any filters are applied (use new endpoint)
   const hasFilters = statusParam || search || startDate || endDate || page > 1 || projectId || queueId;
 
   try {
@@ -116,7 +173,7 @@ export async function GET(request: Request) {
           startDate,
           endDate,
           projectId,
-          queueId, // NEW
+          queueId,
         },
         page,
         limit
@@ -135,12 +192,9 @@ export async function GET(request: Request) {
     }
 
     // 2. Enrich with Cost Data
-    // In a real implementation, this would be a JOIN or a batch query to the Usage Ledger table.
-    // For now, we fetch the Ledger from our Mock BillingService and map it in memory.
     const ledger = await BillingService.getUsageLedger("user_001");
     
     const enrichedJobs = jobs.map((job) => {
-      // Calculate total cost for this job id
       const cost = ledger
         .filter((item) => item.jobId === job.id)
         .reduce((sum, item) => sum + item.amount, 0);
@@ -149,7 +203,6 @@ export async function GET(request: Request) {
     });
 
     if (hasFilters) {
-       // Also fetch counts for the pills
        const counts = await countJobsByStatus();
        
        return NextResponse.json({
