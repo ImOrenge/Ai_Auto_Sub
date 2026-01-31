@@ -1,23 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
+import { rm } from "node:fs/promises";
 import { getSupabaseServer } from "@/lib/supabaseServer";
 import { generateSrt } from "@/lib/subtitle/srt";
 import { generateAss } from "@/lib/subtitle/ass";
-import type { CaptionData, SubtitleConfig } from "@/lib/jobs/types";
+import type { CaptionData, SubtitleConfig, VideoCut } from "@/lib/jobs/types";
 import { DEFAULT_SUBTITLE_CONFIG } from "@/lib/jobs/types";
+import { resolveCachedSourceUrl } from "@/lib/jobs/source";
 import {
   downloadAudioFromUrl,
   applySubtitlesToVideo,
   uploadToStorage,
+  prepareSequenceMedia,
 } from "@/lib/jobs/operations";
-import type { SubtitleResult } from "@/lib/jobs/operations";
+import type { SubtitleResult, DownloadedAudio } from "@/lib/jobs/operations";
 import { BillingService } from "@/lib/billing/service";
 import { env } from "@/lib/env";
 import { MOCK_USER_ID } from "@/lib/utils";
+import { WebhookService } from "@/lib/webhooks/service";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
 type ExportRequest = {
   format: "srt" | "ass" | "mp4";
+  resolution?: "sd" | "hd" | "fhd" | "uhd" | "720p" | "1080p" | "4k";
+  renderer?: "remotion" | "ffmpeg" | "canvas";
 };
 
 /**
@@ -28,10 +34,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const { id } = await params;
 
   try {
-    const body = (await request.json()) as ExportRequest;
-    const { format } = body;
+    const body = await request.json().catch(() => null);
+    let { format, resolution, renderer } = (body as ExportRequest) || {};
+    
+    // Default to mp4 if format is missing
+    if (!format) {
+      format = "mp4";
+    }
 
-    if (!format || !["srt", "ass", "mp4"].includes(format)) {
+    console.info(`[export] Requesting export for job ${id}, format: ${format}, resolution: ${resolution || 'original'}`);
+
+    if (!["srt", "ass", "mp4"].includes(format)) {
+      console.warn(`[export] Invalid format requested: ${format}`);
       return NextResponse.json(
         { error: "Invalid format. Must be 'srt', 'ass', or 'mp4'" },
         { status: 400 }
@@ -39,11 +53,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     const supabase = getSupabaseServer();
+    console.info(`[export] Fetching job ${id}...`);
 
     // Fetch job data
     const { data: job, error } = await supabase
       .from("jobs")
-      .select("user_id, url, caption_source, caption_edit, subtitle_config")
+      .select("user_id, url, result_video_url, caption_source, caption_edit, subtitle_config, cuts, sequence")
       .eq("id", id)
       .single();
 
@@ -55,20 +70,37 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Use edited captions if available, otherwise source
+    // Use edited captions if available, otherwise source
     const captionData: CaptionData | null = job.caption_edit ?? job.caption_source;
 
     if (!captionData || !captionData.cues || captionData.cues.length === 0) {
+      console.warn(`[export] No captions found for job ${id}`);
       return NextResponse.json(
         { error: "No captions to export" },
         { status: 400 }
       );
     }
 
-    const style: SubtitleConfig = captionData.defaultStyle ?? job.subtitle_config ?? DEFAULT_SUBTITLE_CONFIG;
+    const style: SubtitleConfig = {
+      ...DEFAULT_SUBTITLE_CONFIG,
+      ...(captionData.defaultStyle || {}),
+      ...(job.subtitle_config || {})
+    };
 
     // Handle MP4 export (video with burned-in subtitles)
     if (format === "mp4") {
-      return await handleMp4Export(id, job.url, captionData, style, supabase, job.user_id);
+      const sourceUrl = resolveCachedSourceUrl(job.url, job.result_video_url);
+      
+      // FIRE AND FORGET: Start the potentially long-running render in the background
+      void handleMp4Export(id, sourceUrl, captionData, style, supabase, job.user_id, job.cuts, job.sequence, resolution, renderer);
+      
+      // Return immediately so the UI can redirect to the progress/result page
+      return NextResponse.json({
+        success: true,
+        message: "Export started in background",
+        jobId: id,
+        format: "mp4"
+      }, { status: 202 });
     }
 
     // Handle SRT/ASS export
@@ -117,6 +149,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       })
       .eq("id", id);
 
+    // Trigger Webhook: job.completed (SRT/ASS)
+    void WebhookService.trigger(job.user_id || MOCK_USER_ID, "job.completed", { 
+      jobId: id, 
+      format, 
+      downloadUrl: urlData.publicUrl 
+    }).catch();
+
     return NextResponse.json({
       success: true,
       downloadUrl: urlData.publicUrl,
@@ -141,8 +180,13 @@ async function handleMp4Export(
   captionData: CaptionData,
   style: SubtitleConfig,
   supabase: ReturnType<typeof getSupabaseServer>,
-  userId: string
+  userId: string,
+  cuts?: VideoCut[] | null,
+  sequence?: any | null,
+  resolution?: string,
+  renderer?: "remotion" | "ffmpeg" | "canvas"
 ) {
+  let audio: DownloadedAudio | undefined;
   try {
     // Update status to exporting
     await supabase
@@ -150,20 +194,28 @@ async function handleMp4Export(
       .update({ status: "exporting" })
       .eq("id", jobId);
 
-    // Download the source video
-    console.info(`[export/mp4] Downloading source video for job ${jobId}`);
-    const audio = await downloadAudioFromUrl(sourceUrl);
+    // Prepare master video (Sequence or Single source)
+    if (sequence) {
+      console.info(`[export/mp4] Preparing sequence media for job ${jobId}`);
+      audio = await prepareSequenceMedia(sequence, jobId);
+      // For sequence jobs, segments are already handled by concatenation.
+      // We set cuts to null so renderVideoWithCaptions doesn't try to cut the master video.
+      cuts = null;
+    } else {
+      console.info(`[export/mp4] Downloading source video for job ${jobId}`);
+      audio = await downloadAudioFromUrl(sourceUrl);
+    }
 
-    // Generate SRT content for subtitle burning
-    const srtContent = generateSrt(captionData.cues);
+    // Generate ASS content for subtitle burning
+    const assContent = generateAss(captionData.cues, style);
     const subtitles: SubtitleResult = {
-      fileName: `subtitles_${jobId.slice(0, 8)}.srt`,
-      content: srtContent,
+      fileName: `subtitles_${jobId.slice(0, 8)}.ass`,
+      content: assContent,
     };
 
     // Apply subtitles to video
-    console.info(`[export/mp4] Rendering video with subtitles for job ${jobId}`);
-    const captionedVideo = await applySubtitlesToVideo(audio, subtitles, style);
+    console.info(`[export/mp4] Rendering video with subtitles for job ${jobId} at ${resolution || 'original'} resolution (using ${renderer || 'remotion'})`);
+    const captionedVideo = await applySubtitlesToVideo(audio, subtitles, style, cuts, resolution, captionData.cues, jobId, renderer as 'canvas' | undefined);
 
     if (!captionedVideo.publicUrl) {
       throw new Error("Failed to render video with subtitles");
@@ -198,6 +250,13 @@ async function handleMp4Export(
       })
       .eq("id", jobId);
 
+    // Trigger Webhook: job.completed (MP4)
+    void WebhookService.trigger(userId || MOCK_USER_ID, "job.completed", { 
+      jobId, 
+      format: "mp4", 
+      downloadUrl: captionedVideo.publicUrl 
+    }).catch();
+
     console.info(`[export/mp4] Video export completed for job ${jobId}`);
 
     return NextResponse.json({
@@ -218,9 +277,21 @@ async function handleMp4Export(
       })
       .eq("id", jobId);
 
+    // Trigger Webhook: job.failed
+    void WebhookService.trigger(userId || MOCK_USER_ID, "job.failed", { 
+      jobId, 
+      error: err instanceof Error ? err.message : "MP4 export failed" 
+    }).catch();
+
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "MP4 export failed" },
       { status: 500 }
     );
+
+  } finally {
+    if (audio?.tempDir) {
+      console.info(`[export/mp4] Cleaning up temp directory: ${audio.tempDir}`);
+      await rm(audio.tempDir, { recursive: true, force: true });
+    }
   }
 }

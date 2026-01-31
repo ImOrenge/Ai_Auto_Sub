@@ -3,7 +3,7 @@
  * Detects problems in subtitle cues (too long, too many lines, overlaps, etc.)
  */
 
-import type { SubtitleCue, CueProblem, CueProblemType } from "@/lib/jobs/types";
+import type { SubtitleCue, CueProblem, CueProblemType } from "../jobs/types";
 
 // Validation thresholds
 const MAX_LINES = 2;

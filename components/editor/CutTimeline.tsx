@@ -18,7 +18,11 @@ import {
     Copy,
     Scissors as ScissorsIcon,
     ClipboardPaste,
-    Files
+    Files,
+    Type,
+    Music,
+    Video,
+    Sparkles
 } from "lucide-react";
 import {
     DropdownMenu,
@@ -62,6 +66,9 @@ export function CutTimeline({
         cutClip,
         pasteClip,
         clipboard,
+        addCue,
+        selectedCueId,
+        selectCue,
     } = useEditor();
 
     const trackRef = useRef<HTMLDivElement>(null);
@@ -304,16 +311,19 @@ export function CutTimeline({
         };
     }, [dragInfo, sequenceDuration, clips, onClipsChange, pps, clipsWithOffsets, onSeek, onClipSelect]);
 
-    const handleDropOnPlaceholder = useCallback((e: React.DragEvent) => {
+    const handleDropOnPlaceholder = useCallback((e: React.DragEvent, type: 'video' | 'audio' | 'caption' = 'video') => {
         e.preventDefault();
         try {
             const data = e.dataTransfer.getData("application/json");
             if (data) {
                 const asset = JSON.parse(data);
-                addLayer(`Sequence ${layers.length + 1}`, asset);
+                addLayer(undefined, asset, type);
+            } else {
+                addLayer(undefined, undefined, type);
             }
         } catch (err) {
             console.error("Failed to drop", err);
+            addLayer(undefined, undefined, type);
         }
     }, [layers.length, addLayer]);
 
@@ -489,7 +499,7 @@ export function CutTimeline({
             >
                 <div
                     ref={trackRef}
-                    className="relative min-w-full flex flex-col pt-10 pb-6"
+                    className="relative min-w-full flex flex-col pt-7 pb-6"
                     style={{ width: sequenceDurationInPx + 400 }} // Added some buffer
                     onMouseDown={(e) => {
                         if (e.button !== 0) return; // Only left click for seeking/dragging
@@ -498,7 +508,7 @@ export function CutTimeline({
                         const clickX = e.clientX - rect.left;
                         const clickTime = clickX / pps;
 
-                        const isRuler = (e.clientY - rect.top) < 40;
+                        const isRuler = (e.clientY - rect.top) < 28;
                         const isSelectionDrag = e.altKey || isRuler;
 
                         if (isSelectionDrag) {
@@ -535,15 +545,15 @@ export function CutTimeline({
                     }}
                 >
                     {/* Time Ruler */}
-                    <div className="absolute top-0 left-0 right-0 h-10 border-b bg-card/90 backdrop-blur-sm z-30">
+                    <div className="absolute top-0 left-0 right-0 h-7 border-b bg-card/90 backdrop-blur-sm z-30">
                         {timeMarkers.map(t => (
                             <div
                                 key={t}
                                 className="absolute top-0 border-l border-border h-full flex flex-col justify-end"
                                 style={{ left: t * pps }}
                             >
-                                <span className="text-[9px] font-mono text-muted-foreground ml-1.5 mb-1">{formatTime(t)}</span>
-                                <div className="absolute bottom-0 left-0 w-px h-2 bg-muted-foreground/30" />
+                                <span className="text-[9px] font-mono text-muted-foreground ml-1.5 mb-0.5">{formatTime(t)}</span>
+                                <div className="absolute bottom-0 left-0 w-px h-1.5 bg-muted-foreground/30" />
                             </div>
                         ))}
                     </div>
@@ -553,9 +563,9 @@ export function CutTimeline({
                         onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('bg-primary/20', 'border-primary/50'); }}
                         onDragLeave={e => e.currentTarget.classList.remove('bg-primary/20', 'border-primary/50')}
                         onDrop={e => { e.currentTarget.classList.remove('bg-primary/20', 'border-primary/50'); handleDropOnPlaceholder(e); }}
-                        className="h-8 border-b border-dashed border-border/50 flex items-center justify-center transition-all group/new-track"
+                        className="h-6 border-b border-dashed border-border/50 flex items-center justify-center transition-all group/new-track"
                     >
-                        <Plus className="size-4 text-muted-foreground/20 group-hover/new-track:text-primary transition-all" />
+                        <Plus className="size-3.5 text-muted-foreground/20 group-hover/new-track:text-primary transition-all" />
                     </div>
 
                     {/* Tracks Stack */}
@@ -576,121 +586,183 @@ export function CutTimeline({
                                 }}
                                 onContextMenu={(e) => handleContextMenu(e, undefined, layer.id)}
                                 className={cn(
-                                    "relative h-20 transition-all border rounded-lg flex",
+                                    "relative h-14 transition-all border rounded-lg flex overflow-hidden",
                                     activeLayerId === layer.id
                                         ? "bg-primary/5 border-primary/30 shadow-[inset_0_0_20px_rgba(var(--primary),0.05)]"
-                                        : "bg-background/40 border-border/30 hover:border-border hover:bg-muted/10"
+                                        : "bg-background/40 border-border/30 hover:border-border hover:bg-muted/10",
+                                    layer.type === 'caption' && "h-10",
+                                    layer.type === 'audio' && "h-12"
                                 )}
                             >
-                                {/* Track Content */}
-                                <div className="relative flex-1 overflow-hidden h-full">
-                                    {(layer.clips || []).map((clip, idx) => {
-                                        // Calculate offset accounting for speed
-                                        const clipOffset = layer.clips.slice(0, idx).reduce((acc, c) => {
-                                            const dur = c.endTime - c.startTime;
-                                            const spd = ('speed' in c && c.speed) ? c.speed : 1;
-                                            return acc + (dur / spd);
-                                        }, 0);
-                                        const rawWidth = clip.endTime - clip.startTime;
-                                        const clipSpeed = ('speed' in clip && clip.speed) ? clip.speed : 1;
-                                        const clipWidth = rawWidth / clipSpeed;
+                                {/* Track Label/Icon */}
+                                <div className="w-8 flex flex-col items-center justify-center border-r bg-muted/20 text-muted-foreground/40 shrink-0">
+                                    {layer.type === 'video' && <Video className="size-3" />}
+                                    {layer.type === 'audio' && <Music className="size-3" />}
+                                    {layer.type === 'caption' && <Type className="size-3" />}
+                                </div>
 
-                                        return (
-                                            <div
-                                                key={clip.id}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onClipSelect?.(clip.id);
-                                                }}
-                                                className={cn(
-                                                    "absolute inset-y-2 border rounded-md overflow-hidden bg-card shadow-sm transition-all",
-                                                    (activeLayerId === layer.id && activeClipId === clip.id) ? "border-primary ring-2 ring-primary/20 z-10" : "border-border/50 z-0"
-                                                )}
-                                                style={{
-                                                    left: clipOffset * pps,
-                                                    width: clipWidth * pps
-                                                }}
-                                                onContextMenu={(e) => handleContextMenu(e, clip.id, layer.id)}
-                                            >
-                                                <div className="absolute inset-0 opacity-40">
-                                                    <ClipThumbnails
-                                                        src={clip.asset.storageKey ? `/api/assets/${clip.asset.id}/view` : (clip.asset.sourceUrl || "")}
-                                                        startTime={clip.startTime}
-                                                        endTime={clip.endTime}
-                                                        width={clipWidth * pps}
-                                                        height={80}
-                                                    />
-                                                </div>
-                                                <div className="absolute inset-x-0 bottom-0 h-8 opacity-20 pointer-events-none">
-                                                    <WaveformDisplay
-                                                        width={clipWidth * pps}
-                                                        height={32}
-                                                        color="hsl(var(--primary))"
-                                                    />
-                                                </div>
-                                                <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent to-transparent flex flex-col justify-end p-1.5 pointer-events-none">
-                                                    <span className="text-[9px] font-bold truncate text-foreground">{clip.asset.filename}</span>
-                                                    <div className="flex items-center gap-1">
-                                                        <span className="text-[7px] font-mono opacity-50">{formatTime(clipWidth)}</span>
-                                                        {clipSpeed !== 1 && (
-                                                            <span className="text-[7px] font-mono text-primary font-bold">{clipSpeed}x</span>
-                                                        )}
+                                {/* Track Content */}
+                                <div className="relative flex-1 h-full">
+                                    {layer.type === 'caption' ? (
+                                        /* Render Captions as Sequence Blocks [ ] */
+                                        <div className="absolute inset-0">
+                                            {(layer.cues || []).map(cue => (
+                                                <div
+                                                    key={cue.id}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        selectCue(cue.id);
+                                                        onSeek(cue.startTime);
+                                                    }}
+                                                    className={cn(
+                                                        "absolute inset-y-1 border rounded-md overflow-hidden transition-all cursor-pointer group/cue",
+                                                        selectedCueId === cue.id
+                                                            ? "bg-primary/20 border-primary ring-2 ring-primary/20 z-10"
+                                                            : "bg-primary/5 border-primary/20 hover:border-primary/40 hover:bg-primary/10 z-0"
+                                                    )}
+                                                    style={{
+                                                        left: cue.startTime * pps,
+                                                        width: (cue.endTime - cue.startTime) * pps
+                                                    }}
+                                                >
+                                                    {/* Visual "Bracket" markers for [ ] look */}
+                                                    <div className="absolute inset-y-0 left-0 w-1 bg-primary/40" />
+                                                    <div className="absolute inset-y-0 right-0 w-1 bg-primary/40" />
+
+                                                    <div className="px-2 py-0.5 h-full flex items-center overflow-hidden">
+                                                        <span className="text-[10px] font-bold truncate text-foreground/70 group-hover/cue:text-foreground transition-colors">
+                                                            {cue.text}
+                                                        </span>
+                                                    </div>
+
+                                                    {/* Glassmorphism Hover Tooltip */}
+                                                    <div className="absolute -top-6 left-0 opacity-0 group-hover/cue:opacity-100 transition-all duration-200 pointer-events-none">
+                                                        <div className="bg-background/95 backdrop-blur-xl border border-primary/20 px-2 py-1 rounded shadow-2xl flex items-center gap-2">
+                                                            <Type className="size-2.5 text-primary" />
+                                                            <span className="text-[10px] font-black text-foreground whitespace-nowrap">{cue.text}</span>
+                                                        </div>
                                                     </div>
                                                 </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        /* Render Clips */
+                                        (layer.clips || []).map((clip, idx) => {
+                                            const clipOffset = layer.clips.slice(0, idx).reduce((acc, c) => {
+                                                const dur = c.endTime - c.startTime;
+                                                const spd = ('speed' in c && c.speed) ? c.speed : 1;
+                                                return acc + (dur / spd);
+                                            }, 0);
+                                            const rawWidth = clip.endTime - clip.startTime;
+                                            const clipSpeed = ('speed' in clip && clip.speed) ? clip.speed : 1;
+                                            const clipWidth = rawWidth / clipSpeed;
 
-                                                {/* Trimming Handles */}
-                                                {(activeLayerId === layer.id && activeClipId === clip.id) && (
-                                                    <>
-                                                        <div
-                                                            className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-primary/30 z-20"
-                                                            onMouseDown={(e) => {
-                                                                e.stopPropagation();
-                                                                setDragInfo({
-                                                                    type: 'start',
-                                                                    id: clip.id,
-                                                                    startX: e.clientX,
-                                                                    initialStart: clip.startTime,
-                                                                    initialEnd: clip.endTime
-                                                                });
-                                                            }}
+                                            return (
+                                                <div
+                                                    key={clip.id}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onClipSelect?.(clip.id);
+                                                    }}
+                                                    className={cn(
+                                                        "absolute inset-y-1 border rounded-md overflow-hidden bg-card shadow-sm transition-all",
+                                                        (activeLayerId === layer.id && activeClipId === clip.id) ? "border-primary ring-2 ring-primary/20 z-10" : "border-border/50 z-0"
+                                                    )}
+                                                    style={{
+                                                        left: clipOffset * pps,
+                                                        width: clipWidth * pps
+                                                    }}
+                                                    onContextMenu={(e) => handleContextMenu(e, clip.id, layer.id)}
+                                                >
+                                                    <div className="absolute inset-0 opacity-40">
+                                                        <ClipThumbnails
+                                                            src={clip.asset.storageKey ? `/api/assets/${clip.asset.id}/view` : (clip.asset.sourceUrl || "")}
+                                                            startTime={clip.startTime}
+                                                            endTime={clip.endTime}
+                                                            width={clipWidth * pps}
+                                                            height={56}
                                                         />
-                                                        <div
-                                                            className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-primary/30 z-20"
-                                                            onMouseDown={(e) => {
-                                                                e.stopPropagation();
-                                                                setDragInfo({
-                                                                    type: 'end',
-                                                                    id: clip.id,
-                                                                    startX: e.clientX,
-                                                                    initialStart: clip.startTime,
-                                                                    initialEnd: clip.endTime
-                                                                });
-                                                            }}
-                                                        />
-                                                    </>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
+                                                    </div>
+                                                    {layer.type === 'audio' && (
+                                                        <div className="absolute inset-x-0 bottom-0 h-full opacity-30 pointer-events-none">
+                                                            <WaveformDisplay
+                                                                width={clipWidth * pps}
+                                                                height={48}
+                                                                color="hsl(var(--primary))"
+                                                            />
+                                                        </div>
+                                                    )}
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent to-transparent flex flex-col justify-end p-1.5 pointer-events-none">
+                                                        <span className="text-[9px] font-bold truncate text-foreground leading-none mb-0.5">{clip.asset.filename}</span>
+                                                        <div className="flex items-center gap-1">
+                                                            <span className="text-[7px] font-mono opacity-50 leading-none">{formatTime(clipWidth)}</span>
+                                                            {clipSpeed !== 1 && (
+                                                                <span className="text-[7px] font-mono text-primary font-bold leading-none">{clipSpeed}x</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {(activeLayerId === layer.id && activeClipId === clip.id) && (
+                                                        <>
+                                                            <div
+                                                                className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-primary/30 z-20"
+                                                                onMouseDown={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setDragInfo({
+                                                                        type: 'start',
+                                                                        id: clip.id,
+                                                                        startX: e.clientX,
+                                                                        initialStart: clip.startTime,
+                                                                        initialEnd: clip.endTime
+                                                                    });
+                                                                }}
+                                                            />
+                                                            <div
+                                                                className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-primary/30 z-20"
+                                                                onMouseDown={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setDragInfo({
+                                                                        type: 'end',
+                                                                        id: clip.id,
+                                                                        startX: e.clientX,
+                                                                        initialStart: clip.startTime,
+                                                                        initialEnd: clip.endTime
+                                                                    });
+                                                                }}
+                                                            />
+                                                        </>
+                                                    )}
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                    <div className="absolute inset-0 z-0 opacity-0 hover:opacity-10 transition-opacity bg-primary pointer-events-none" />
                                 </div>
                             </div>
                         ))}
                     </div>
 
-                    {/* Bottom Placeholder */}
+
+                    {/* Subtle New Track Drop Zone */}
                     <div
-                        onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('bg-primary/10', 'border-primary/50'); }}
-                        onDragLeave={e => e.currentTarget.classList.remove('bg-primary/10', 'border-primary/50')}
-                        onDrop={e => { e.currentTarget.classList.remove('bg-primary/10', 'border-primary/50'); handleDropOnPlaceholder(e); }}
-                        className="h-14 flex items-center justify-center border-t border-dashed border-border/50 group/new-track transition-all mt-3 rounded-lg hover:border-primary/30"
+                        onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('bg-primary/5', 'border-primary/20'); }}
+                        onDragLeave={e => e.currentTarget.classList.remove('bg-primary/5', 'border-primary/20')}
+                        onDrop={e => {
+                            e.currentTarget.classList.remove('bg-primary/5', 'border-primary/20');
+                            try {
+                                const data = e.dataTransfer.getData("application/json");
+                                if (data) {
+                                    const asset = JSON.parse(data);
+                                    const type = asset.meta?.mimeType?.startsWith('audio/') ? 'audio' : 'video';
+                                    addLayer(undefined, asset, type);
+                                }
+                            } catch { }
+                        }}
+                        className="h-8 mt-1 border border-dashed border-transparent rounded-lg flex items-center justify-center transition-all hover:border-border/50 hover:bg-muted/5 group"
                     >
-                        <div className="flex items-center gap-3 text-[10px] font-black text-muted-foreground/30 group-hover/new-track:text-primary transition-all tracking-[0.2em]">
-                            <Plus className="size-4 animate-pulse" />
-                            <span>DRAG ASSET HERE TO ADD LAYER</span>
-                        </div>
+                        <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/0 group-hover:text-muted-foreground/30 transition-all">Drop here to add new track</span>
                     </div>
 
-                    {/* Selection Highlight */}
                     {selectionRange && (
                         <div
                             className="absolute top-0 bottom-0 bg-primary/20 border-x border-primary/50 z-20 pointer-events-none"

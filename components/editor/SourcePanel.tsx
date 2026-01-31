@@ -12,7 +12,8 @@ import {
     AlertCircle,
     Search,
     Loader2,
-    Trash2
+    Trash2,
+    Music
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,9 +43,16 @@ export function SourcePanel({
     const [isUploading, setIsUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
 
-    const filteredAssets = assets.filter(a =>
-        a.filename.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const [selectedTab, setSelectedTab] = useState<'all' | 'video' | 'audio'>('all');
+
+    const filteredAssets = assets.filter(a => {
+        const matchesSearch = a.filename.toLowerCase().includes(searchQuery.toLowerCase());
+        const isAudio = a.meta?.mimeType?.startsWith('audio/');
+        const matchesTab = selectedTab === 'all' ||
+            (selectedTab === 'video' && !isAudio) ||
+            (selectedTab === 'audio' && isAudio);
+        return matchesSearch && matchesTab;
+    });
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files?.length || isUploading) return;
@@ -160,27 +168,30 @@ export function SourcePanel({
 
     return (
         <div className="flex flex-col h-full bg-card overflow-hidden">
-            {/* Header / Actions */}
-            <div className="p-4 border-b space-y-4 bg-muted/10">
+            {/* Header / Actions - Streamlined */}
+            <div className="p-3 border-b space-y-3 bg-muted/10">
                 <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Sources</h3>
+                    <div className="flex items-center gap-2">
+                        <FileVideo className="size-3.5 text-primary" />
+                        <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Sources</h3>
+                    </div>
                     <div className="flex gap-1">
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="size-7 rounded-full"
+                            className="size-6 rounded-md hover:bg-primary/10 hover:text-primary"
                             onClick={() => fileInputRef.current?.click()}
                             disabled={isUploading}
                         >
-                            <Plus className="size-4" />
+                            <Plus className="size-3.5" />
                         </Button>
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="size-7 rounded-full"
+                            className="size-6 rounded-md hover:bg-primary/10 hover:text-primary"
                             onClick={() => setIsAddingUrl(!isAddingUrl)}
                         >
-                            <LinkIcon className="size-4" />
+                            <LinkIcon className="size-3.5" />
                         </Button>
                     </div>
                 </div>
@@ -244,12 +255,43 @@ export function SourcePanel({
                         </div>
                     )}
                 </div>
+
+                {/* Tabs Switcher */}
+                <div className="flex bg-muted/20 p-1 rounded-lg gap-1">
+                    <button
+                        onClick={() => setSelectedTab('all')}
+                        className={cn(
+                            "flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all",
+                            selectedTab === 'all' ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:bg-muted/30"
+                        )}
+                    >
+                        All
+                    </button>
+                    <button
+                        onClick={() => setSelectedTab('video')}
+                        className={cn(
+                            "flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all",
+                            selectedTab === 'video' ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:bg-muted/30"
+                        )}
+                    >
+                        Video
+                    </button>
+                    <button
+                        onClick={() => setSelectedTab('audio')}
+                        className={cn(
+                            "flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all",
+                            selectedTab === 'audio' ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:bg-muted/30"
+                        )}
+                    >
+                        Audio
+                    </button>
+                </div>
             </div>
 
-            {/* Asset List */}
-            <div className="flex-1 overflow-y-auto px-4 py-2 custom-scrollbar">
+            {/* Asset List - 2*n Grid Layout */}
+            <div className="flex-1 overflow-y-auto px-3 py-2 custom-scrollbar">
                 {filteredAssets.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                         {filteredAssets.map((asset) => (
                             <button
                                 key={asset.id}
@@ -258,7 +300,6 @@ export function SourcePanel({
                                 onDragStart={(e) => {
                                     e.dataTransfer.setData("application/json", JSON.stringify(asset));
                                     e.dataTransfer.effectAllowed = "copy";
-                                    // Add drag image styling
                                     const dragImage = e.currentTarget.cloneNode(true) as HTMLElement;
                                     dragImage.style.opacity = "0.8";
                                     dragImage.style.transform = "scale(0.9)";
@@ -267,56 +308,70 @@ export function SourcePanel({
                                     setTimeout(() => document.body.removeChild(dragImage), 0);
                                 }}
                                 className={cn(
-                                    "flex items-center gap-3 p-2 rounded-xl border text-left transition-all group relative overflow-hidden cursor-grab active:cursor-grabbing",
+                                    "flex flex-col rounded-xl border text-left transition-all group relative overflow-hidden cursor-grab active:cursor-grabbing bg-card/50",
                                     selectedAssetId === asset.id
-                                        ? "bg-primary/10 border-primary ring-1 ring-primary/20"
-                                        : "hover:bg-muted border-transparent"
+                                        ? "bg-primary/5 border-primary ring-1 ring-primary/20"
+                                        : "hover:bg-muted/50 border-border/50"
                                 )}
                             >
-                                {/* Thumbnail Placeholder / Preview */}
-                                <div className="size-12 rounded-lg bg-black flex items-center justify-center relative shrink-0 overflow-hidden shadow-inner">
+                                {/* Thumbnail - Top */}
+                                <div className="aspect-video w-full bg-black flex items-center justify-center relative shrink-0 overflow-hidden">
                                     {asset.meta?.thumbnailUrl ? (
-                                        <img src={asset.meta.thumbnailUrl} alt="" className="size-full object-cover" />
+                                        <img src={asset.meta.thumbnailUrl} alt="" className="size-full object-cover transition-transform duration-500 group-hover:scale-110" />
                                     ) : (
-                                        <FileVideo className="size-6 text-muted-foreground/30" />
+                                        asset.meta?.mimeType?.startsWith('audio/') ? (
+                                            <Music className="size-6 text-primary/40" />
+                                        ) : (
+                                            <FileVideo className="size-6 text-muted-foreground/20" />
+                                        )
                                     )}
+
+                                    {/* Status Overlay */}
                                     {(asset.status === 'downloading' || asset.status === 'processing' || asset.status === 'uploading' || asset.transcriptionStatus === 'transcribing') && (
-                                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                        <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex items-center justify-center">
                                             <Loader2 className="size-4 text-white animate-spin" />
+                                        </div>
+                                    )}
+
+                                    {/* Duration Badge */}
+                                    {asset.meta?.duration && (
+                                        <div className="absolute bottom-1 right-1 bg-black/70 backdrop-blur-md px-1.5 py-0.5 rounded text-[8px] font-mono text-white/90">
+                                            {Math.round(asset.meta.duration)}s
                                         </div>
                                     )}
                                 </div>
 
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-1">
-                                        <h4 className="text-[11px] font-bold truncate">{asset.filename}</h4>
-                                        {asset.status === 'uploaded' && (
-                                            <CheckCircle2 className="size-3 text-emerald-500 shrink-0" />
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <span className="text-[9px] text-muted-foreground/60 font-mono">
-                                            {asset.meta?.duration ? `${Math.round(asset.meta.duration)}s` :
-                                                asset.status === 'failed' ? 'Error' : 'Processing...'}
+                                {/* Info - Bottom */}
+                                <div className="p-2 min-w-0">
+                                    <h4 className="text-[10px] font-bold truncate leading-tight mb-0.5" title={asset.filename}>
+                                        {asset.filename}
+                                    </h4>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[8px] text-muted-foreground/60 font-medium uppercase tracking-tighter">
+                                            {asset.status === 'uploaded' ? 'Ready' : (asset.status === 'failed' ? 'Failed' : 'Processing')}
                                         </span>
+                                        {asset.status === 'uploaded' && (
+                                            <CheckCircle2 className="size-2.5 text-emerald-500" />
+                                        )}
                                         {asset.status === 'failed' && (
-                                            <span className="text-[8px] text-destructive font-black uppercase tracking-tighter flex items-center gap-0.5">
-                                                <AlertCircle className="size-2" /> Fail
-                                            </span>
+                                            <AlertCircle className="size-2.5 text-destructive" />
                                         )}
                                     </div>
                                 </div>
 
-                                <div className="absolute -right-12 group-hover:right-2 transition-all opacity-0 group-hover:opacity-100 flex gap-1">
+                                {/* Hover Actions */}
+                                <div className="absolute top-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
                                     <div
-                                        className="size-7 rounded-lg bg-background border flex items-center justify-center hover:bg-destructive hover:text-destructive-foreground transition-colors cursor-pointer"
+                                        className="size-6 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 flex items-center justify-center hover:bg-destructive transition-colors cursor-pointer text-white"
                                         onClick={(e) => handleDeleteAsset(e, asset.id)}
-                                        title="Delete Source"
+                                        title="Delete"
                                     >
-                                        <Trash2 className="size-3.5" />
+                                        <Trash2 className="size-3" />
                                     </div>
-                                    <div className="size-7 rounded-lg bg-background border flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-colors cursor-pointer">
-                                        <Plus className="size-3.5" />
+                                </div>
+                                <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                    <div className="size-6 rounded-lg bg-primary/80 backdrop-blur-md flex items-center justify-center text-white">
+                                        <Plus className="size-3" />
                                     </div>
                                 </div>
                             </button>
@@ -324,8 +379,14 @@ export function SourcePanel({
                     </div>
                 ) : (
                     <div className="py-12 text-center text-muted-foreground flex flex-col items-center justify-center min-h-[200px]">
-                        <FileVideo className="size-8 opacity-10 mb-2" />
-                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-40">No sources found</p>
+                        {selectedTab === 'audio' ? (
+                            <Music className="size-8 opacity-10 mb-2" />
+                        ) : (
+                            <FileVideo className="size-8 opacity-10 mb-2" />
+                        )}
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-40">
+                            {selectedTab === 'audio' ? "No audio found" : (selectedTab === 'video' ? "No videos found" : "No sources found")}
+                        </p>
                     </div>
                 )}
             </div>
@@ -335,7 +396,7 @@ export function SourcePanel({
                 ref={fileInputRef}
                 onChange={handleFileUpload}
                 className="hidden"
-                accept="video/*"
+                accept="video/*,audio/*"
             />
         </div>
     );

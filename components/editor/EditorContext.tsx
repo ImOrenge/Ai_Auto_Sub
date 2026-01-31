@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, type ReactNode, type Dispatch, type SetStateAction } from "react";
+import { createContext, useContext, useState, useCallback, useRef, type ReactNode, type Dispatch, type SetStateAction } from "react";
 import type {
     SubtitleCue,
     SubtitleConfig,
@@ -8,11 +8,12 @@ import type {
     CaptionData,
     LanguageConfig,
     PlaybackSpeed,
-    SequenceClip
-} from "@/lib/jobs/types";
-import type { AssetRecord } from "@/lib/assets/types";
-import { DEFAULT_SUBTITLE_CONFIG, DEFAULT_LANGUAGE_CONFIG } from "@/lib/jobs/types";
-import { validateAllCues } from "@/lib/subtitle/validation";
+    SequenceClip,
+    SequenceLayerType
+} from "../../lib/jobs/types";
+import type { AssetRecord } from "../../lib/assets/types";
+import { DEFAULT_SUBTITLE_CONFIG, DEFAULT_LANGUAGE_CONFIG } from "../../lib/jobs/types";
+import { validateAllCues } from "../../lib/subtitle/validation";
 
 // ============================================================================
 // Editor Types
@@ -21,6 +22,7 @@ import { validateAllCues } from "@/lib/subtitle/validation";
 export type EditorLayer = {
     id: string;
     name: string;
+    type: SequenceLayerType;
     clips: {
         id: string;
         asset: AssetRecord;
@@ -103,11 +105,13 @@ type EditorState = {
     activeLayerId: string | null;
     /** Clipboard for copy/paste */
     clipboard: ClipClipboard | null;
+    /** All cues from all caption layers combined */
+    allCues: SubtitleCue[];
 };
 
 type EditorActions = {
     /** Set all cues */
-    setCues: (cues: SubtitleCue[]) => void;
+    setCues: (cues: SubtitleCue[] | ((prev: SubtitleCue[]) => SubtitleCue[])) => void;
     /** Select a cue by ID */
     selectCue: (id: number | null) => void;
     /** Update a specific cue */
@@ -125,7 +129,7 @@ type EditorActions = {
     /** Set playing state */
     setIsPlaying: (playing: boolean) => void;
     /** Load caption data */
-    loadCaptionData: (data: CaptionData) => void;
+    loadCaptionData: (data: CaptionData, options?: { skipCues?: boolean }) => void;
     /** Get current caption data */
     getCaptionData: () => CaptionData;
     /** Mark as saved */
@@ -172,7 +176,7 @@ type EditorActions = {
     /** Set crop area */
     setCropArea: (area: { x: number; y: number; width: number; height: number }) => void;
     /** Add a new layer */
-    addLayer: (name?: string, initialAsset?: AssetRecord) => void;
+    addLayer: (name?: string, initialAsset?: AssetRecord, type?: SequenceLayerType) => void;
     /** Duplicate an existing layer */
     duplicateLayer: (id: string) => void;
     /** Delete a layer */
@@ -238,15 +242,26 @@ export function EditorProvider({ children, initialData }: EditorProviderProps) {
     const [activeClipId, setActiveClipId] = useState<string | null>(null);
     const [inPoint, setInPoint] = useState<number | null>(null);
     const [outPoint, setOutPoint] = useState<number | null>(null);
-    const [videoFit, setVideoFit] = useState<'contain' | 'cover'>('contain');
-    const [videoAspectRatio, setVideoAspectRatio] = useState<'original' | '9:16' | '1:1' | '16:9'>('original');
+    const [videoFit, setVideoFitInternal] = useState<'contain' | 'cover'>('contain');
+    const [videoAspectRatio, setVideoAspectRatioInternal] = useState<'original' | '9:16' | '1:1' | '16:9'>('original');
     const [isCropping, setIsCropping] = useState(false);
     const [cropArea, setCropAreaInternal] = useState(initialData?.defaultStyle?.cropArea ?? { x: 0, y: 0, width: 100, height: 100 });
     const [layers, setLayers] = useState<EditorLayer[]>([
-        { id: 'layer-1', name: 'Main Timeline', clips: [], cues: [] }
+        { id: 'layer-1', name: 'Main Timeline', type: 'video', clips: [], cues: [] }
     ]);
     const [activeLayerId, setActiveLayerId] = useState<string | null>('layer-1');
+    const activeLayerIdRef = useRef<string | null>('layer-1');
     const [clipboard, setClipboard] = useState<ClipClipboard | null>(null);
+
+    const setVideoFit = useCallback((fit: 'contain' | 'cover') => {
+        setVideoFitInternal(fit);
+        setIsDirty(true);
+    }, []);
+
+    const setVideoAspectRatio = useCallback((ratio: 'original' | '9:16' | '1:1' | '16:9') => {
+        setVideoAspectRatioInternal(ratio);
+        setIsDirty(true);
+    }, []);
 
     const setCropArea = useCallback((area: { x: number; y: number; width: number; height: number }) => {
         setCropAreaInternal(area);
@@ -263,7 +278,7 @@ export function EditorProvider({ children, initialData }: EditorProviderProps) {
             const next = typeof newCues === 'function' ? newCues(prev) : newCues;
             updateProblems(next);
             // Sync to layers
-            setLayers(lPrev => lPrev.map(l => l.id === activeLayerId ? { ...l, cues: next } : l));
+            setLayers(lPrev => lPrev.map(l => l.id === activeLayerIdRef.current ? { ...l, cues: next } : l));
             return next;
         });
         setIsDirty(true);
@@ -274,21 +289,37 @@ export function EditorProvider({ children, initialData }: EditorProviderProps) {
     }, []);
 
     const updateCue = useCallback((id: number, updates: Partial<SubtitleCue>) => {
-        setCuesInternal(prev => {
-            const newCues = prev.map(cue =>
-                cue.id === id ? { ...cue, ...updates } : cue
-            );
-            updateProblems(newCues);
-            return newCues;
+        setLayers(lPrev => {
+            return lPrev.map(l => {
+                if (l.cues.some(c => c.id === id)) {
+                    const newCues = l.cues.map(cue =>
+                        cue.id === id ? { ...cue, ...updates } : cue
+                    );
+                    if (l.id === activeLayerIdRef.current) {
+                        setCuesInternal(newCues);
+                        updateProblems(newCues);
+                    }
+                    return { ...l, cues: newCues };
+                }
+                return l;
+            });
         });
         setIsDirty(true);
     }, [updateProblems]);
 
     const deleteCue = useCallback((id: number) => {
-        setCuesInternal(prev => {
-            const newCues = prev.filter(cue => cue.id !== id);
-            updateProblems(newCues);
-            return newCues;
+        setLayers(lPrev => {
+            return lPrev.map(l => {
+                if (l.cues.some(c => c.id === id)) {
+                    const newCues = l.cues.filter(cue => cue.id !== id);
+                    if (l.id === activeLayerIdRef.current) {
+                        setCuesInternal(newCues);
+                        updateProblems(newCues);
+                    }
+                    return { ...l, cues: newCues };
+                }
+                return l;
+            });
         });
         if (selectedCueId === id) {
             setSelectedCueId(null);
@@ -297,23 +328,36 @@ export function EditorProvider({ children, initialData }: EditorProviderProps) {
     }, [selectedCueId, updateProblems]);
 
     const addCue = useCallback((cue: SubtitleCue) => {
-        setCuesInternal(prev => {
-            const newCues = [...prev, cue].sort((a, b) => a.startTime - b.startTime);
-            updateProblems(newCues);
-            return newCues;
-        });
+        // Default to active layer if it's a caption layer, otherwise first caption layer
+        const targetLayer = layers.find(l => l.id === activeLayerIdRef.current && l.type === 'caption')
+            || layers.find(l => l.type === 'caption');
+
+        if (!targetLayer) return;
+
+        setLayers(lPrev => lPrev.map(l => {
+            if (l.id === targetLayer.id) {
+                const newCues = [...l.cues, cue].sort((a, b) => a.startTime - b.startTime);
+                if (l.id === activeLayerIdRef.current) {
+                    setCuesInternal(newCues);
+                    updateProblems(newCues);
+                }
+                return { ...l, cues: newCues };
+            }
+            return l;
+        }));
         setIsDirty(true);
-    }, [updateProblems]);
+    }, [layers, updateProblems]);
 
     const splitCue = useCallback((id: number, splitTime: number) => {
-        setCuesInternal(prev => {
-            const cueIndex = prev.findIndex(c => c.id === id);
-            if (cueIndex === -1) return prev;
+        setLayers(lPrev => lPrev.map(l => {
+            const cueIndex = l.cues.findIndex(c => c.id === id);
+            if (cueIndex === -1) return l;
 
-            const cue = prev[cueIndex];
-            if (splitTime <= cue.startTime || splitTime >= cue.endTime) return prev;
+            const cue = l.cues[cueIndex];
+            if (splitTime <= cue.startTime || splitTime >= cue.endTime) return l;
 
-            const maxId = Math.max(...prev.map(c => c.id));
+            // Across all layers to avoid ID collision
+            const maxId = Math.max(...lPrev.flatMap(layer => layer.cues.map(c => c.id)), 0);
             const newCue: SubtitleCue = {
                 id: maxId + 1,
                 startTime: splitTime,
@@ -324,15 +368,18 @@ export function EditorProvider({ children, initialData }: EditorProviderProps) {
             const updatedCue = { ...cue, endTime: splitTime };
 
             const newCues = [
-                ...prev.slice(0, cueIndex),
+                ...l.cues.slice(0, cueIndex),
                 updatedCue,
                 newCue,
-                ...prev.slice(cueIndex + 1),
+                ...l.cues.slice(cueIndex + 1),
             ];
 
-            updateProblems(newCues);
-            return newCues;
-        });
+            if (l.id === activeLayerIdRef.current) {
+                setCuesInternal(newCues);
+                updateProblems(newCues);
+            }
+            return { ...l, cues: newCues };
+        }));
         setIsDirty(true);
     }, [updateProblems]);
 
@@ -346,36 +393,60 @@ export function EditorProvider({ children, initialData }: EditorProviderProps) {
         setIsDirty(true);
     }, []);
 
-    const loadCaptionData = useCallback((data: CaptionData) => {
-        setCuesInternal(data.cues);
-        setDefaultStyleInternal(data.defaultStyle);
-        if (data.defaultStyle?.cropArea) {
-            setCropAreaInternal(data.defaultStyle.cropArea);
+    const loadCaptionData = useCallback((data: CaptionData, options?: { skipCues?: boolean }) => {
+        if (!options?.skipCues) {
+            setCuesInternal(data.cues);
+            // Sync to active layer if we have one
+            if (activeLayerIdRef.current) {
+                setLayers(lPrev => lPrev.map(l => l.id === activeLayerIdRef.current ? { ...l, cues: data.cues } : l));
+            }
         }
-        updateProblems(data.cues);
+
+        if (data.defaultStyle) {
+            setDefaultStyleInternal(data.defaultStyle);
+            if (data.defaultStyle.cropArea) {
+                setCropAreaInternal(data.defaultStyle.cropArea);
+            }
+        }
+        if (data.language) setLanguageInternal(data.language);
+        if (data.videoAspectRatio) setVideoAspectRatio(data.videoAspectRatio);
+        if (data.videoFit) setVideoFit(data.videoFit);
+        if (data.playbackSpeed) setPlaybackSpeed(data.playbackSpeed);
+        if (!options?.skipCues) {
+            updateProblems(data.cues);
+        }
         setIsDirty(false);
-    }, [updateProblems]);
+    }, [activeLayerIdRef, updateProblems]);
 
     const getCaptionData = useCallback((): CaptionData => {
+        // Flatten all cues from all layers for export/save
+        const allCombinedCues = layers
+            .flatMap(l => l.cues.map(c => ({ ...c, layerId: l.id })))
+            .sort((a, b) => a.startTime - b.startTime);
+
         return {
             version: 1,
-            cues,
+            cues: allCombinedCues,
             defaultStyle: {
                 ...defaultStyle,
                 cropArea
             },
-            // Note: We might want to expand CaptionData in types.ts to include languageConfig
+            language,
+            videoAspectRatio,
+            videoFit,
+            playbackSpeed
         };
-    }, [cues, defaultStyle, cropArea]);
+    }, [layers, defaultStyle, cropArea, language, videoAspectRatio, videoFit, playbackSpeed]);
 
     const markSaved = useCallback(() => {
         setIsDirty(false);
     }, []);
 
-    const addLayer = useCallback((name?: string, initialAsset?: AssetRecord) => {
+    const addLayer = useCallback((name?: string, initialAsset?: AssetRecord, type: SequenceLayerType = 'video') => {
         const newLayer: EditorLayer = {
             id: crypto.randomUUID(),
-            name: name || `Sequence ${layers.length + 1}`,
+            name: name || `${type.charAt(0).toUpperCase() + type.slice(1)} ${layers.length + 1}`,
+            type,
             clips: initialAsset ? [
                 {
                     id: crypto.randomUUID(),
@@ -389,6 +460,7 @@ export function EditorProvider({ children, initialData }: EditorProviderProps) {
         };
         setLayers(prev => [...prev, newLayer]);
         setActiveLayerId(newLayer.id);
+        activeLayerIdRef.current = newLayer.id;
         setClips(newLayer.clips);
         setCuesInternal([]);
         setDuration(initialAsset?.meta?.duration || 10);
@@ -402,7 +474,7 @@ export function EditorProvider({ children, initialData }: EditorProviderProps) {
         setLayers(prev => {
             // Save current state to the active layer before switching
             return prev.map(layer => {
-                if (layer.id === activeLayerId) {
+                if (layer.id === activeLayerIdRef.current) {
                     return { ...layer, clips, cues };
                 }
                 return layer;
@@ -412,6 +484,7 @@ export function EditorProvider({ children, initialData }: EditorProviderProps) {
         const targetLayer = layers.find(l => l.id === id);
         if (targetLayer) {
             setActiveLayerId(id);
+            activeLayerIdRef.current = id;
             setClips(targetLayer.clips);
             setCuesInternal(targetLayer.cues);
             updateProblems(targetLayer.cues);
@@ -419,18 +492,20 @@ export function EditorProvider({ children, initialData }: EditorProviderProps) {
     }, [activeLayerId, clips, cues, layers, updateProblems]);
 
     const duplicateLayer = useCallback((id: string) => {
-        const sourceLayer = layers.find(l => l.id === id) || (id === activeLayerId ? { id, name: "Current", clips, cues } : null);
+        const sourceLayer = layers.find(l => l.id === id) || (id === activeLayerId ? { id, name: "Current", type: 'video' as SequenceLayerType, clips, cues } : null);
         if (!sourceLayer) return;
 
         const newLayer: EditorLayer = {
             id: crypto.randomUUID(),
             name: `${sourceLayer.name} (Copy)`,
+            type: sourceLayer.type as SequenceLayerType,
             clips: [...sourceLayer.clips.map(c => ({ ...c, id: crypto.randomUUID() }))],
             cues: [...sourceLayer.cues.map(c => ({ ...c, id: Math.random() }))], // Simple ID generation for copy
         };
 
         setLayers(prev => [...prev, newLayer]);
         setActiveLayerId(newLayer.id);
+        activeLayerIdRef.current = newLayer.id;
         setClips(newLayer.clips);
         setCuesInternal(newLayer.cues);
         updateProblems(newLayer.cues);
@@ -445,6 +520,7 @@ export function EditorProvider({ children, initialData }: EditorProviderProps) {
             const remaining = layers.filter(l => l.id !== id);
             const nextLayer = remaining[0];
             setActiveLayerId(nextLayer.id);
+            activeLayerIdRef.current = nextLayer.id;
             setClips(nextLayer.clips);
             setCuesInternal(nextLayer.cues);
             updateProblems(nextLayer.cues);
@@ -484,7 +560,7 @@ export function EditorProvider({ children, initialData }: EditorProviderProps) {
             newLayers[layerIndex] = { ...layer, clips: newClips };
 
             // If it's the active layer, sync the local clips state too
-            if (layerId === activeLayerId) {
+            if (layerId === activeLayerIdRef.current) {
                 setClips(newClips);
                 const newDuration = newClips.reduce((acc, c) => {
                     const clipDuration = c.endTime - c.startTime;
@@ -510,7 +586,7 @@ export function EditorProvider({ children, initialData }: EditorProviderProps) {
                 newClips.forEach((c, i) => c.order = i);
 
                 // If it's the active layer, sync clips too
-                if (layer.id === activeLayerId) {
+                if (layer.id === activeLayerIdRef.current) {
                     setClips(newClips);
                     if (activeClipId === clipId) setActiveClipId(null);
                 }
@@ -540,7 +616,7 @@ export function EditorProvider({ children, initialData }: EditorProviderProps) {
                 // Reorder
                 newClips.forEach((c, i) => c.order = i);
 
-                if (layer.id === activeLayerId) {
+                if (layer.id === activeLayerIdRef.current) {
                     setClips(newClips);
                 }
 
@@ -594,7 +670,7 @@ export function EditorProvider({ children, initialData }: EditorProviderProps) {
             const newLayers = [...prev];
             newLayers[layerIndex] = { ...layer, clips: newClips };
 
-            if (layer.id === activeLayerId) {
+            if (layer.id === activeLayerIdRef.current) {
                 setClips(newClips);
             }
 
@@ -609,6 +685,7 @@ export function EditorProvider({ children, initialData }: EditorProviderProps) {
         if (targetId) {
             const target = newLayers.find(l => l.id === targetId) || newLayers[0];
             setActiveLayerId(target.id);
+            activeLayerIdRef.current = target.id;
             setClips(target.clips);
             setCuesInternal(target.cues);
             updateProblems(target.cues);
@@ -644,6 +721,7 @@ export function EditorProvider({ children, initialData }: EditorProviderProps) {
         layers,
         activeLayerId,
         clipboard,
+        allCues: layers.flatMap(l => l.cues.map(c => ({ ...c, layerId: l.id }))).sort((a, b) => a.startTime - b.startTime),
         // Actions
         setCues,
         selectCue,
@@ -669,7 +747,7 @@ export function EditorProvider({ children, initialData }: EditorProviderProps) {
             setClips(prev => {
                 const next = typeof update === 'function' ? update(prev) : update;
                 // Sync to layers
-                setLayers(lPrev => lPrev.map(l => l.id === activeLayerId ? { ...l, clips: next } : l));
+                setLayers(lPrev => lPrev.map(l => l.id === activeLayerIdRef.current ? { ...l, clips: next } : l));
                 // Update total duration based on new clips (accounting for speed)
                 const newDuration = (next as SequenceClip[]).reduce((acc: number, c: SequenceClip) => {
                     const clipDuration = c.endTime - c.startTime;
@@ -693,7 +771,7 @@ export function EditorProvider({ children, initialData }: EditorProviderProps) {
                 });
 
                 // Sync to layers
-                setLayers(lPrev => lPrev.map(l => l.id === activeLayerId ? { ...l, clips: updatedClips } : l));
+                setLayers(lPrev => lPrev.map(l => l.id === activeLayerIdRef.current ? { ...l, clips: updatedClips } : l));
 
                 // Recalculate total duration accounting for speed
                 const newDuration = updatedClips.reduce((acc, c) => {

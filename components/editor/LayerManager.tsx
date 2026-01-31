@@ -50,19 +50,19 @@ export function LayerManager() {
 
 
     return (
-        <div className="flex flex-col gap-2 p-4 bg-muted/30 rounded-lg border border-border/50">
-            <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-                    <Layers className="size-4" />
-                    <span>Sequence Layers</span>
+        <div className="flex flex-col gap-1.5 p-3 bg-muted/20 rounded-lg border border-border/50">
+            <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                    <Layers className="size-3.5 text-primary" />
+                    <span>Layers</span>
                 </div>
                 <Button
                     variant="ghost"
                     size="icon"
-                    className="size-7 rounded-full hover:bg-primary/10 hover:text-primary"
+                    className="size-6 rounded-md hover:bg-primary/10 hover:text-primary"
                     onClick={() => addLayer()}
                 >
-                    <Plus className="size-4" />
+                    <Plus className="size-3.5" />
                 </Button>
             </div>
 

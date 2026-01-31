@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useMemo } from "react";
 import { useEditor } from "./EditorContext";
 import { SubtitleCue, VideoCut } from "@/lib/jobs/types";
 import { AlertCircle, RefreshCcw, Crop, Maximize, Minimize, Settings2, Check } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
@@ -152,7 +153,7 @@ export function VideoPlayer({
     activeClip = null
 }: VideoPlayerProps) {
     const {
-        cues,
+        allCues: cues,
         currentTime,
         setCurrentTime: onTimeUpdate,
         isPlaying,
@@ -185,13 +186,26 @@ export function VideoPlayer({
     const [activeCue, setActiveCue] = useState<SubtitleCue | null>(null);
     const [videoError, setVideoError] = useState<string | null>(null);
 
-    // Unified Aspect Ratio Classes for the Canvas
-    const canvasRatioClass = {
-        'original': 'aspect-video w-full h-full', // Default to 16:9 box if original, but content stays within
-        '9:16': 'aspect-[9/16] h-full mx-auto',
-        '1:1': 'aspect-square h-full mx-auto',
-        '16:9': 'aspect-video w-full my-auto'
-    }[videoAspectRatio];
+    const [sourceDimensions, setSourceDimensions] = useState({ width: 1920, height: 1080 });
+
+    const handleMetadataLoaded = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
+        const vid = e.currentTarget;
+        if (vid.videoWidth && vid.videoHeight) {
+            setSourceDimensions({ width: vid.videoWidth, height: vid.videoHeight });
+            if (onDurationChange) onDurationChange(vid.duration);
+        }
+    };
+
+    const containerAspectRatio = useMemo(() => {
+        if (videoAspectRatio === 'original') {
+            if (!sourceDimensions.height) return 16 / 9;
+            return sourceDimensions.width / sourceDimensions.height;
+        }
+        if (videoAspectRatio === '9:16') return 9 / 16;
+        if (videoAspectRatio === '1:1') return 1;
+        if (videoAspectRatio === '16:9') return 16 / 9;
+        return 16 / 9;
+    }, [videoAspectRatio, sourceDimensions]);
 
     const contentFitClass = videoFit === 'cover' ? "object-cover" : "object-contain";
 
@@ -440,6 +454,51 @@ export function VideoPlayer({
         setActiveCue(matchedCue || null);
     }, [currentTime, cues, activeClip]);
 
+    // ------------------------------------------------------------------------
+    // High-Resolution Time Tracking (for smooth animations)
+    // ------------------------------------------------------------------------
+    const [smoothTime, setSmoothTime] = useState(currentTime);
+    const timeRequestRef = useRef<number | null>(null);
+
+    useEffect(() => {
+        if (!isPlaying) {
+            setSmoothTime(currentTime);
+            if (timeRequestRef.current) {
+                cancelAnimationFrame(timeRequestRef.current);
+                timeRequestRef.current = null;
+            }
+            return;
+        }
+
+        const tick = () => {
+            let now = 0;
+            if (isYouTube && youTubePlayerRef.current && youTubeReadyRef.current) {
+                now = youTubePlayerRef.current.getCurrentTime();
+            } else if (videoRef.current) {
+                now = videoRef.current.currentTime;
+            }
+
+            if (now > 0) {
+                // Update local visual time (60fps)
+                setSmoothTime(now);
+
+                // Still update global context time but throttled (handled by existing effect)
+                // Just use rAF for the visual overlay
+            }
+            timeRequestRef.current = requestAnimationFrame(tick);
+        };
+
+        timeRequestRef.current = requestAnimationFrame(tick);
+
+        return () => {
+            if (timeRequestRef.current) cancelAnimationFrame(timeRequestRef.current);
+        };
+    }, [isPlaying, isYouTube, currentTime]); // Depend on currentTime to sync when scrubbing
+
+    // ------------------------------------------------------------------------
+    // Existing Effects
+    // ------------------------------------------------------------------------
+
     // Reset error when src changes for non-YouTube sources
     useEffect(() => {
         if (isYouTube) return;
@@ -574,6 +633,55 @@ export function VideoPlayer({
         transformOrigin: 'center center'
     } : {};
 
+    // JS-based sizing for robust "contain" behavior
+    const wrapperRef = useRef<HTMLDivElement>(null);
+    const [canvasSize, setCanvasSize] = useState<{ width: number, height: number } | null>(null);
+
+    useEffect(() => {
+        const wrapper = wrapperRef.current;
+        if (!wrapper) return;
+
+        const observer = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const { width: parentW, height: parentH } = entry.contentRect;
+                if (parentW === 0 || parentH === 0) continue;
+
+                const targetRatio = containerAspectRatio;
+                const parentRatio = parentW / parentH;
+
+                let newW, newH;
+
+                if (parentRatio > targetRatio) {
+                    // Parent is wider than target -> Fit to Height
+                    newH = parentH;
+                    newW = newH * targetRatio;
+                } else {
+                    // Parent is taller than target -> Fit to Width
+                    newW = parentW;
+                    newH = newW / targetRatio;
+                }
+
+                // Adding a small buffer or floor to prevent sub-pixel rounding overflow issues
+                setCanvasSize({ width: Math.floor(newW), height: Math.floor(newH) });
+            }
+        });
+
+        observer.observe(wrapper);
+        return () => observer.disconnect();
+    }, [containerAspectRatio]);
+
+    const renderingDimensions = useMemo(() => {
+        if (videoAspectRatio === 'original') {
+            if (sourceDimensions.width && sourceDimensions.height) {
+                return sourceDimensions;
+            }
+            return { width: 1920, height: 1080 };
+        }
+        if (videoAspectRatio === '9:16') return { width: 1080, height: 1920 };
+        if (videoAspectRatio === '1:1') return { width: 1080, height: 1080 };
+        return { width: 1920, height: 1080 };
+    }, [videoAspectRatio, sourceDimensions]);
+
     if (videoError) {
         return (
             <div className="relative w-full h-full bg-black flex flex-col items-center justify-center text-white gap-4 p-8">
@@ -594,17 +702,28 @@ export function VideoPlayer({
     }
 
     return (
-        <div className="relative w-full h-full bg-black group flex items-center justify-center overflow-hidden p-6 md:p-10">
-            {/* The Visual Canvas (Standard Ratio Container) */}
-            <div className={cn(
-                "relative transition-all duration-300 shadow-2xl bg-muted/5 ring-1 ring-white/10",
-                canvasRatioClass
-            )}>
+        <div ref={wrapperRef} className="relative w-full h-full bg-neutral-950 group flex items-center justify-center overflow-hidden p-6 md:p-10">
+            <div
+                className={cn(
+                    "relative transition-all duration-300 shadow-2xl bg-black ring-1 ring-white/10 overflow-hidden",
+                )}
+                style={{
+                    width: canvasSize?.width ?? '100%',
+                    height: canvasSize?.height ?? '100%',
+                    // Fallback to aspect ratio just in case JS lags
+                    aspectRatio: !canvasSize ? containerAspectRatio : undefined,
+                }}
+            >
+                {/* Checkerboard pattern */}
+                <div className="absolute inset-0 opacity-20 pointer-events-none"
+                    style={{ backgroundImage: 'radial-gradient(circle, #333 1px, transparent 1px)', backgroundSize: '20px 20px' }}
+                />
+
                 {isYouTube ? (
                     <div
                         ref={youTubeContainerRef}
                         className={cn(
-                            "w-full h-full transition-all duration-300",
+                            "absolute inset-0 transition-all duration-300",
                             contentFitClass === "object-cover" ? "scaling-cover" : "scaling-contain"
                         )}
                         style={cropStyle}
@@ -616,12 +735,12 @@ export function VideoPlayer({
                         src={src}
                         crossOrigin={src.startsWith('/api/') ? undefined : "anonymous"}
                         className={cn(
-                            "w-full h-full transition-all duration-500",
+                            "absolute inset-0 w-full h-full transition-all duration-500",
                             contentFitClass
                         )}
                         style={cropStyle}
                         onTimeUpdate={(e) => onTimeUpdate(e.currentTarget.currentTime)}
-                        onDurationChange={(e) => onDurationChange?.(e.currentTarget.duration)}
+                        onLoadedMetadata={handleMetadataLoaded}
                         onPlay={() => onPlayPause?.(true)}
                         onPause={() => onPlayPause?.(false)}
                         onError={handleVideoError}
@@ -629,14 +748,19 @@ export function VideoPlayer({
                 )}
 
                 {/* Caption Overlay */}
-                {activeCue && (
-                    <SubtitleOverlay
-                        cue={activeCue}
-                        style={defaultStyle}
-                        currentTime={currentTime}
-                        onClick={() => setIsStyleToolbarOpen(!isStyleToolbarOpen)}
-                    />
-                )}
+                <AnimatePresence mode="popLayout">
+                    {activeCue && (
+                        <SubtitleOverlayView
+                            key={`${activeCue.layerId}-${activeCue.id}`}
+                            cue={activeCue}
+                            style={defaultStyle}
+                            currentTime={smoothTime}
+                            width={renderingDimensions.width}
+                            height={renderingDimensions.height}
+                            onClick={() => setIsStyleToolbarOpen(!isStyleToolbarOpen)}
+                        />
+                    )}
+                </AnimatePresence>
 
                 {/* Floating Style Toolbar */}
                 {isStyleToolbarOpen && (
@@ -651,7 +775,7 @@ export function VideoPlayer({
             {/* Hover Floating Controls */}
             {!isCropping && (
                 <div className="absolute bottom-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 z-30 translate-y-2 group-hover:translate-y-0">
-                    <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-xl p-1.5 rounded-2xl border border-white/10 shadow-2xl">
+                    <div className="flex items-center gap-1.5 bg-black/80 backdrop-blur-xl p-1.5 rounded-2xl border border-white/10 shadow-2xl">
                         <Button
                             variant="ghost"
                             size="sm"
@@ -689,26 +813,47 @@ export function VideoPlayer({
                                     className="h-9 px-3 gap-2 text-white hover:bg-white/10 whitespace-nowrap rounded-xl"
                                 >
                                     <Settings2 className="size-4" />
-                                    <span className="text-[11px] font-bold uppercase tracking-wider">Canvas: {videoAspectRatio}</span>
+                                    <span className="text-[11px] font-bold uppercase tracking-wider">Canvas Size: {videoAspectRatio}</span>
                                 </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="center" side="top" sideOffset={12} className="bg-black/90 backdrop-blur-xl border-white/10 text-white min-w-[140px] rounded-xl p-1 shadow-2xl">
-                                {(['original', '9:16', '1:1', '16:9'] as const).map((ratio) => (
+                            <DropdownMenuContent align="center" side="top" sideOffset={12} className="bg-black/90 backdrop-blur-xl border-white/10 text-white min-w-[160px] rounded-xl p-1 shadow-2xl">
+                                <DropdownMenuItem
+                                    className={cn(
+                                        "gap-3 focus:bg-white/10 focus:text-white cursor-pointer rounded-lg py-2",
+                                        videoAspectRatio === 'original' && "bg-white/5"
+                                    )}
+                                    onClick={() => {
+                                        setVideoAspectRatio('original');
+                                        setCropArea({ x: 0, y: 0, width: 100, height: 100 });
+                                    }}
+                                >
+                                    <div className="size-4 flex items-center justify-center">
+                                        {videoAspectRatio === 'original' && <Check className="size-3 text-primary" />}
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-xs font-bold capitalize">Smart Original</span>
+                                        <span className="text-[9px] opacity-40">Native Aspect</span>
+                                    </div>
+                                </DropdownMenuItem>
+
+                                {(['16:9', '9:16', '1:1'] as const).map((ratio) => (
                                     <DropdownMenuItem
                                         key={ratio}
                                         className={cn(
                                             "gap-3 focus:bg-white/10 focus:text-white cursor-pointer rounded-lg py-2",
                                             videoAspectRatio === ratio && "bg-white/5"
                                         )}
-                                        onClick={() => setVideoAspectRatio(ratio)}
+                                        onClick={() => {
+                                            setVideoAspectRatio(ratio);
+                                        }}
                                     >
                                         <div className="size-4 flex items-center justify-center">
-                                            {videoAspectRatio === ratio && <Check className="size-3.5 text-primary" />}
+                                            {videoAspectRatio === ratio && <Check className="size-3 text-primary" />}
                                         </div>
                                         <div className="flex flex-col">
-                                            <span className="text-xs font-bold capitalize">{ratio === 'original' ? 'Smart Original' : ratio}</span>
+                                            <span className="text-xs font-bold capitalize">{ratio}</span>
                                             <span className="text-[9px] opacity-40">
-                                                {ratio === '9:16' ? 'TikTok / Reels' : ratio === '16:9' ? 'YouTube' : ratio === '1:1' ? 'Instagram' : 'Native Aspect'}
+                                                {ratio === '9:16' ? 'TikTok / Reels' : ratio === '16:9' ? 'YouTube' : ratio === '1:1' ? 'Instagram' : 'Standard'}
                                             </span>
                                         </div>
                                     </DropdownMenuItem>
@@ -729,7 +874,19 @@ export function VideoPlayer({
                     onMouseUp={handleCropMouseUp}
                     onMouseLeave={handleCropMouseUp}
                 >
-                    <div className={cn("relative", canvasRatioClass)}>
+                    <div
+                        className={cn(
+                            "relative transition-all shadow-xl",
+                            "bg-black ring-1 ring-white/20"
+                        )}
+                        style={{
+                            aspectRatio: containerAspectRatio,
+                            height: containerAspectRatio < 1 ? '100%' : 'auto',
+                            width: containerAspectRatio >= 1 ? '100%' : 'auto',
+                            maxHeight: '100%',
+                            maxWidth: '100%'
+                        }}
+                    >
                         {/* Video Background for Crop */}
                         <div className="absolute inset-0 opacity-20">
                             {isYouTube ? (
@@ -761,40 +918,25 @@ export function VideoPlayer({
                             </div>
 
                             {/* Corner Drag Handles */}
-                            <div
-                                className="absolute -top-2 -left-2 size-4 bg-primary ring-4 ring-black/50 rounded-full cursor-nwse-resize hover:scale-125 transition-transform z-10"
-                                onMouseDown={(e) => handleCornerMouseDown(e, 'nw')}
-                            />
-                            <div
-                                className="absolute -top-2 -right-2 size-4 bg-primary ring-4 ring-black/50 rounded-full cursor-nesw-resize hover:scale-125 transition-transform z-10"
-                                onMouseDown={(e) => handleCornerMouseDown(e, 'ne')}
-                            />
-                            <div
-                                className="absolute -bottom-2 -left-2 size-4 bg-primary ring-4 ring-black/50 rounded-full cursor-nesw-resize hover:scale-125 transition-transform z-10"
-                                onMouseDown={(e) => handleCornerMouseDown(e, 'sw')}
-                            />
-                            <div
-                                className="absolute -bottom-2 -right-2 size-4 bg-primary ring-4 ring-black/50 rounded-full cursor-nwse-resize hover:scale-125 transition-transform z-10"
-                                onMouseDown={(e) => handleCornerMouseDown(e, 'se')}
-                            />
+                            {['nw', 'ne', 'sw', 'se'].map((corner) => (
+                                <div
+                                    key={corner}
+                                    className={cn(
+                                        "absolute size-4 bg-primary ring-4 ring-black/50 rounded-full hover:scale-125 transition-transform z-10",
+                                        corner.includes('n') ? "-top-2" : "-bottom-2",
+                                        corner.includes('w') ? "-left-2" : "-right-2",
+                                        corner === 'nw' || corner === 'se' ? "cursor-nwse-resize" : "cursor-nesw-resize"
+                                    )}
+                                    // @ts-ignore
+                                    onMouseDown={(e) => handleCornerMouseDown(e, corner as DragType)}
+                                />
+                            ))}
 
                             {/* Edge Drag Handles */}
-                            <div
-                                className="absolute -top-1 left-1/2 -translate-x-1/2 w-8 h-2 bg-primary/80 rounded-full cursor-ns-resize hover:bg-primary transition-colors z-10"
-                                onMouseDown={(e) => handleCornerMouseDown(e, 'n')}
-                            />
-                            <div
-                                className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-8 h-2 bg-primary/80 rounded-full cursor-ns-resize hover:bg-primary transition-colors z-10"
-                                onMouseDown={(e) => handleCornerMouseDown(e, 's')}
-                            />
-                            <div
-                                className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-8 bg-primary/80 rounded-full cursor-ew-resize hover:bg-primary transition-colors z-10"
-                                onMouseDown={(e) => handleCornerMouseDown(e, 'w')}
-                            />
-                            <div
-                                className="absolute top-1/2 -right-1 -translate-y-1/2 w-2 h-8 bg-primary/80 rounded-full cursor-ew-resize hover:bg-primary transition-colors z-10"
-                                onMouseDown={(e) => handleCornerMouseDown(e, 'e')}
-                            />
+                            <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-8 h-2 bg-primary/80 rounded-full cursor-ns-resize hover:bg-primary transition-colors z-10" onMouseDown={(e) => handleCornerMouseDown(e, 'n')} />
+                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-8 h-2 bg-primary/80 rounded-full cursor-ns-resize hover:bg-primary transition-colors z-10" onMouseDown={(e) => handleCornerMouseDown(e, 's')} />
+                            <div className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-8 bg-primary/80 rounded-full cursor-ew-resize hover:bg-primary transition-colors z-10" onMouseDown={(e) => handleCornerMouseDown(e, 'w')} />
+                            <div className="absolute top-1/2 -right-1 -translate-y-1/2 w-2 h-8 bg-primary/80 rounded-full cursor-ew-resize hover:bg-primary transition-colors z-10" onMouseDown={(e) => handleCornerMouseDown(e, 'e')} />
                         </div>
                     </div>
 
@@ -836,147 +978,7 @@ export function VideoPlayer({
 }
 
 
-/**
- * Subtitle Overlay with Effects
- */
-function SubtitleOverlay({
-    cue,
-    style,
-    currentTime,
-    onClick
-}: {
-    cue: SubtitleCue;
-    style: any;
-    currentTime: number;
-    onClick?: () => void;
-}) {
-    const effect = style.effect || 'none';
-    const animation = style.animation || { fadeIn: 300, fadeOut: 300 };
-
-    // Common styles
-    const containerStyle: React.CSSProperties = {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        textAlign: 'center',
-        pointerEvents: 'none',
-        padding: '0 2rem',
-        zIndex: 10,
-        // Positioning
-        bottom: style.position === 'bottom' ? `${style.marginV ?? 20}px` : undefined,
-        top: style.position === 'top' ? `${style.marginV ?? 20}px` : undefined,
-        display: style.position === 'center' ? 'flex' : undefined,
-        alignItems: style.position === 'center' ? 'center' : undefined,
-        justifyContent: style.position === 'center' ? 'center' : undefined,
-        height: style.position === 'center' ? '100%' : undefined,
-    };
-
-    const textStyle: React.CSSProperties = {
-        display: 'inline-block',
-        backgroundColor: style.backgroundColor || 'rgba(0,0,0,0.6)',
-        color: style.primaryColor || '#FFFFFF',
-        fontSize: `${style.fontSize || 24}px`,
-        fontFamily: style.fontName || 'Arial',
-        fontWeight: style.fontWeight || 'normal',
-        padding: '0.25rem 1rem',
-        borderRadius: '0.25rem',
-        WebkitTextStroke: `${style.outlineWidth || 0}px ${style.outlineColor || '#000000'}`,
-        textShadow: '0 2px 4px rgba(0,0,0,0.5)',
-        backdropFilter: 'blur(4px)',
-        border: '1px solid rgba(255,255,255,0.05)',
-        cursor: onClick ? 'pointer' : 'default',
-        pointerEvents: 'auto',
-    };
-
-    // Calculate progression for karaoke/highlight
-    const duration = cue.endTime - cue.startTime;
-    const elapsed = currentTime - cue.startTime;
-    const progress = Math.max(0, Math.min(1, elapsed / duration));
-
-    const renderContent = () => {
-        const lines = cue.text.split('\n');
-
-        if (effect === 'typewriter') {
-            const charCount = cue.text.length;
-            const typewriterDuration = duration * 0.8; // Finish slightly before end
-            return (
-                <div style={{
-                    ...textStyle,
-                    overflow: 'hidden',
-                    whiteSpace: 'nowrap',
-                    width: `${progress * 100}%`
-                }}>
-                    {lines.map((line, i) => (
-                        <div key={i}>{line}</div>
-                    ))}
-                </div>
-            );
-        }
-
-        if (effect === 'karaoke' || effect === 'highlight') {
-            const allWords = cue.text.split(/\s+/);
-            let wordCursor = 0;
-
-            return (
-                <div style={textStyle}>
-                    {lines.map((line, li) => {
-                        const wordsInLine = line.split(/\s+/).filter(Boolean);
-                        return (
-                            <div key={li} className="flex flex-wrap justify-center gap-[0.25em]">
-                                {wordsInLine.map((word, wi) => {
-                                    const currentWordIndex = wordCursor++;
-                                    const wordCount = allWords.length;
-                                    const wordStart = currentWordIndex / wordCount;
-                                    const isHighlighted = progress >= wordStart;
-
-                                    return (
-                                        <span
-                                            key={`${li}-${wi}`}
-                                            style={{
-                                                color: effect === 'karaoke'
-                                                    ? (isHighlighted ? '#FFFF00' : style.primaryColor)
-                                                    : (isHighlighted ? style.primaryColor : 'rgba(255,255,255,0.4)'),
-                                                transition: 'color 0.2s ease, transform 0.2s ease',
-                                                transform: effect === 'highlight' && isHighlighted ? 'scale(1.15)' : 'scale(1)',
-                                                display: 'inline-block',
-                                                fontWeight: isHighlighted ? 'bold' : 'normal'
-                                            }}
-                                        >
-                                            {word}
-                                        </span>
-                                    );
-                                })}
-                            </div>
-                        );
-                    })}
-                </div>
-            );
-        }
-
-        // Default or Fade
-        const isFading = effect === 'fade';
-        return (
-            <div style={{
-                ...textStyle,
-                opacity: isFading ? (progress < 0.1 ? progress * 10 : (progress > 0.9 ? (1 - progress) * 10 : 1)) : 1,
-                transition: isFading ? 'opacity 0.2s ease' : 'none'
-            }}>
-                {lines.map((line, i) => (
-                    <div key={i}>{line}</div>
-                ))}
-            </div>
-        );
-    };
-
-    return (
-        <div style={containerStyle} onClick={(e) => {
-            if (e.target === e.currentTarget) return;
-            onClick?.();
-        }}>
-            {renderContent()}
-        </div>
-    );
-}
+import { SubtitleOverlayView } from "./SubtitleOverlayView";
 
 import {
     Bold,

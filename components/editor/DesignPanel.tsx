@@ -180,7 +180,7 @@ export function DesignPanel() {
                     <input
                         type="range"
                         min={0}
-                        max={100}
+                        max={200}
                         value={defaultStyle.marginV}
                         onChange={(e) => handleChange("marginV", parseInt(e.target.value))}
                         className="w-full accent-primary"
