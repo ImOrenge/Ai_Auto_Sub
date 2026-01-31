@@ -92,7 +92,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       const sourceUrl = resolveCachedSourceUrl(job.url, job.result_video_url);
       
       // FIRE AND FORGET: Start the potentially long-running render in the background
-      void handleMp4Export(id, sourceUrl, captionData, style, supabase, job.user_id, job.cuts, job.sequence, resolution, renderer);
+      void handleMp4Export(id, sourceUrl, captionData, style, supabase, job.user_id, job.cuts, job.sequence, resolution, renderer, captionData.videoAspectRatio);
       
       // Return immediately so the UI can redirect to the progress/result page
       return NextResponse.json({
@@ -184,7 +184,8 @@ async function handleMp4Export(
   cuts?: VideoCut[] | null,
   sequence?: any | null,
   resolution?: string,
-  renderer?: "remotion" | "ffmpeg" | "canvas"
+  renderer?: "remotion" | "ffmpeg" | "canvas",
+  aspectRatio?: 'original' | '9:16' | '1:1' | '16:9'
 ) {
   let audio: DownloadedAudio | undefined;
   try {
@@ -214,8 +215,8 @@ async function handleMp4Export(
     };
 
     // Apply subtitles to video
-    console.info(`[export/mp4] Rendering video with subtitles for job ${jobId} at ${resolution || 'original'} resolution (using ${renderer || 'remotion'})`);
-    const captionedVideo = await applySubtitlesToVideo(audio, subtitles, style, cuts, resolution, captionData.cues, jobId, renderer as 'canvas' | undefined);
+    console.info(`[export/mp4] Rendering video with subtitles for job ${jobId} at ${resolution || 'original'} resolution, aspect ${aspectRatio || 'original'} (using ${renderer || 'canvas'})`);
+    const captionedVideo = await applySubtitlesToVideo(audio, subtitles, style, cuts, resolution, captionData.cues, jobId, renderer as 'canvas' | undefined, aspectRatio);
 
     if (!captionedVideo.publicUrl) {
       throw new Error("Failed to render video with subtitles");

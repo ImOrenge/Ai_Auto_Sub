@@ -14,6 +14,7 @@ interface RenderOptions {
   duration?: number; // seconds
   jobId?: string; // For progress updates
   resolution?: string; // e.g. 'sd', 'hd', 'fhd', 'uhd'
+  aspectRatio?: 'original' | '9:16' | '1:1' | '16:9'; // Target aspect ratio from editor
 }
 
 const RESOLUTION_MAP: Record<string, { width: number; height: number }> = {
@@ -26,6 +27,13 @@ const RESOLUTION_MAP: Record<string, { width: number; height: number }> = {
   "4k": { width: 3840, height: 2160 }, // Backward compatibility
 };
 
+// Aspect ratio presets - dimensions optimized for each ratio
+const ASPECT_RATIO_MAP: Record<string, { width: number; height: number }> = {
+  "9:16": { width: 1080, height: 1920 },
+  "1:1": { width: 1080, height: 1080 },
+  "16:9": { width: 1920, height: 1080 },
+};
+
 import { getSupabaseServer } from '../supabaseServer';
 
 export async function renderSubtitleVideo(
@@ -36,9 +44,15 @@ export async function renderSubtitleVideo(
   options: RenderOptions = {}
 ): Promise<void> {
   // 1. Determine Video Specs (if not provided)
-  let { width, height, fps, duration, resolution } = options;
+  let { width, height, fps, duration, resolution, aspectRatio } = options;
 
-  if (resolution && RESOLUTION_MAP[resolution.toLowerCase()]) {
+  // Aspect ratio takes priority over resolution for output dimensions
+  if (aspectRatio && aspectRatio !== 'original' && ASPECT_RATIO_MAP[aspectRatio]) {
+    const target = ASPECT_RATIO_MAP[aspectRatio];
+    width = target.width;
+    height = target.height;
+    console.info(`[node-renderer] Using aspect ratio ${aspectRatio}: ${width}x${height}`);
+  } else if (resolution && RESOLUTION_MAP[resolution.toLowerCase()]) {
     const target = RESOLUTION_MAP[resolution.toLowerCase()];
     width = target.width;
     height = target.height;
