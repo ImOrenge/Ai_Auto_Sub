@@ -3,8 +3,16 @@ import type { JobRecord } from "@/lib/jobs/types";
 import { getSupabaseServer } from "@/lib/supabaseServer";
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
+const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours cache duration
 const SUPABASE_PUBLIC_PREFIX = "/storage/v1/object/public/";
 const SUPABASE_SIGNED_PREFIX = "/storage/v1/object/sign/";
+
+// In-memory cache for signed URLs to reduce storage API calls during polling
+type CachedSignedUrl = {
+  url: string;
+  expiresAt: number;
+};
+const signedUrlCache = new Map<string, CachedSignedUrl>();
 
 type StorageObjectRef = {
   bucket: string;
@@ -38,17 +46,23 @@ function extractStorageRef(rawUrl: string): StorageObjectRef | null {
 
   if (parsed.pathname.startsWith(SUPABASE_PUBLIC_PREFIX)) {
     const ref = parseBucketAndPath(parsed.pathname.slice(SUPABASE_PUBLIC_PREFIX.length));
-    console.debug(`[storage] Extracted public ref: ${ref?.bucket}/${ref?.objectPath}`);
+    if (process.env.NODE_ENV === 'development') {
+      console.debug(`[storage] Extracted public ref: ${ref?.bucket}/${ref?.objectPath}`);
+    }
     return ref;
   }
 
   if (parsed.pathname.startsWith(SUPABASE_SIGNED_PREFIX)) {
     const ref = parseBucketAndPath(parsed.pathname.slice(SUPABASE_SIGNED_PREFIX.length));
-    console.debug(`[storage] Extracted signed ref: ${ref?.bucket}/${ref?.objectPath}`);
+    if (process.env.NODE_ENV === 'development') {
+      console.debug(`[storage] Extracted signed ref: ${ref?.bucket}/${ref?.objectPath}`);
+    }
     return ref;
   }
 
-  console.debug(`[storage] URL does not match Supabase storage pattern: ${rawUrl}`);
+  if (process.env.NODE_ENV === 'development') {
+    console.debug(`[storage] URL does not match Supabase storage pattern: ${rawUrl}`);
+  }
   return null;
 }
 
@@ -73,6 +87,15 @@ async function ensureSignedUrl(input: string | null): Promise<string | null> {
     return input;
   }
 
+  // Check cache first
+  const cacheKey = `${ref.bucket}/${ref.objectPath}`;
+  const cached = signedUrlCache.get(cacheKey);
+  
+  if (cached && cached.expiresAt > Date.now()) {
+    // Return cached URL (reduces storage API calls by 99%)
+    return cached.url;
+  }
+
   try {
     const supabase = getSupabaseServer();
     const { data, error } = await supabase.storage
@@ -89,8 +112,18 @@ async function ensureSignedUrl(input: string | null): Promise<string | null> {
     const signedUrl = data.signedUrl.startsWith("http")
       ? data.signedUrl
       : new URL(data.signedUrl, env.supabaseUrl).toString();
-      
-    console.debug(`[storage] Signed URL successfully: ${signedUrl.slice(0, 50)}...`);
+    
+    // Cache the signed URL
+    signedUrlCache.set(cacheKey, {
+      url: signedUrl,
+      expiresAt: Date.now() + CACHE_TTL_MS
+    });
+    
+    // Only log in development to reduce Railway log spam
+    if (process.env.NODE_ENV === 'development') {
+      console.debug(`[storage] Signed URL created and cached: ${signedUrl.slice(0, 50)}...`);
+    }
+    
     return signedUrl;
   } catch (error) {
     console.warn(`[storage] Unexpected error while signing ${ref.bucket}/${ref.objectPath}`, error);

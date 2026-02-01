@@ -310,7 +310,7 @@ export function MainEditor({ projectId, project, initialAssets }: MainEditorProp
             } catch (err) {
                 console.error("[MainEditor] Polling error:", err);
             }
-        }, 3000);
+        }, 5000); // Increased from 3s to 5s to reduce API load
     }, [addLayer, setCaptions, setInPoint, setIsPipelineRunning, setOutPoint, setPipelineProgress, setPipelineStatus, switchLayer]);
 
     // Initialize Job/Sequence on mount

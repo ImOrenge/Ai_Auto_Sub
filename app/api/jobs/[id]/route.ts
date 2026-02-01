@@ -12,7 +12,7 @@ type RouteContext = {
   }>;
 };
 
-export async function GET(_: Request, { params }: RouteContext) {
+export async function GET(request: Request, { params }: RouteContext) {
   const { id } = await params;
   const job = await getJob(id);
 
@@ -20,7 +20,14 @@ export async function GET(_: Request, { params }: RouteContext) {
     return NextResponse.json({ error: "Job not found" }, { status: 404 });
   }
 
-  const enrichedJob = await withSignedJobAssets(job);
+  // Only sign URLs when necessary to reduce storage API calls during rendering
+  // Skip signing during intermediate statuses (stt, preprocessing, rendering, etc.)
+  const url = new URL(request.url);
+  const forceSign = url.searchParams.get('includeSignedUrls') === 'true';
+  const isTerminalStatus = job.status === 'done' || job.status === 'error' || job.status === 'awaiting_edit' || job.status === 'ready_to_export';
+  const shouldSign = forceSign || isTerminalStatus;
+
+  const enrichedJob = shouldSign ? await withSignedJobAssets(job) : job;
 
   // Enrich with Cost & Usage
   // Using Mock Service for now (fetch ledger for the user)

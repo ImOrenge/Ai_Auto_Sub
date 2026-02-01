@@ -51,7 +51,7 @@ export function ExportResultView({ job: initialJob, projectId }: ExportResultVie
             } catch (err) {
                 console.error("Polling error:", err);
             }
-        }, 3000);
+        }, 5000); // Increased from 3s to 5s to reduce API load
 
         return () => clearInterval(poll);
     }, [job.id, job.status]);
