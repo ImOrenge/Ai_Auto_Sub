@@ -52,11 +52,21 @@ if (!isMainThread) {
 
     // Register Fonts
     if (GlobalFonts) {
-      const fontPath = path.join(process.cwd(), 'lib/render/fonts/Anton-Regular.ttf');
+      // Register Anton font
+      const antonFontPath = path.join(process.cwd(), 'lib/render/fonts/Anton-Regular.ttf');
       try {
-        GlobalFonts.registerFromPath(fontPath, 'Anton');
+        GlobalFonts.registerFromPath(antonFontPath, 'Anton');
       } catch (err) {
-          // Ignore font errors in worker if they were already logged in main
+          console.warn('[Worker] Failed to register Anton font:', err);
+      }
+
+      // Register Korean fonts (Noto Sans KR) for proper Korean character rendering
+      // Using variable font which supports all weights (Regular, Bold, etc.)
+      const koreanFontPath = path.join(process.cwd(), 'lib/render/fonts/NotoSansKR-Variable.ttf');
+      try {
+        GlobalFonts.registerFromPath(koreanFontPath, 'Noto Sans KR');
+      } catch (err) {
+        console.warn('[Worker] Failed to register Noto Sans KR:', err);
       }
     }
 
@@ -342,8 +352,13 @@ export async function renderSubtitleVideo(
           const ctx = canvas.getContext('2d');
           
           if (canvasModule.GlobalFonts) {
-              const fontPath = path.join(process.cwd(), 'lib/render/fonts/Anton-Regular.ttf');
-              try { canvasModule.GlobalFonts.registerFromPath(fontPath, 'Anton'); } catch (e) {}
+              // Register Anton font
+              const antonFontPath = path.join(process.cwd(), 'lib/render/fonts/Anton-Regular.ttf');
+              try { canvasModule.GlobalFonts.registerFromPath(antonFontPath, 'Anton'); } catch (e) {}
+              
+              // Register Korean fonts (Noto Sans KR) - Variable font
+              const koreanFontPath = path.join(process.cwd(), 'lib/render/fonts/NotoSansKR-Variable.ttf');
+              try { canvasModule.GlobalFonts.registerFromPath(koreanFontPath, 'Noto Sans KR'); } catch (e) {}
           }
 
           const presetId = style.effect;

@@ -450,9 +450,23 @@ export const renderSubtitleFrame = (
     const fontSize = baseFontSize * SCALE_FACTOR * responsiveScale;
     const fontWeight = style.fontWeight || 'bold';
     const fontName = style.fontName || 'Arial';
-    // Prioritize Korean fonts for better CJK support
-    const fontFallback = ", 'Malgun Gothic', 'NanumGothic', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Segoe UI', sans-serif";
-    ctx.font = `${fontWeight} ${fontSize}px "${fontName}"${fontFallback}`; 
+    
+    // Map common Korean font names to Noto Sans KR (which is registered in node-renderer)
+    const fontMapping: Record<string, string> = {
+        'NanumGothic': 'Noto Sans KR',
+        'NanumBarunGothic': 'Noto Sans KR',
+        'Malgun Gothic': 'Noto Sans KR',
+        'Apple SD Gothic Neo': 'Noto Sans KR',
+        '맑은 고딕': 'Noto Sans KR',
+        '나눔고딕': 'Noto Sans KR',
+    };
+    
+    const mappedFontName = fontMapping[fontName] || fontName;
+    
+    // Prioritize Noto Sans KR for better Korean character support
+    // This ensures Korean text renders properly in Railway/server environments
+    const fontFallback = ", 'Noto Sans KR', Arial, sans-serif";
+    ctx.font = `${fontWeight} ${fontSize}px "${mappedFontName}"${fontFallback}`; 
     
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
