@@ -1,4 +1,5 @@
-import { readFile, rename, rm } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { readFile, rename, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
@@ -274,11 +275,13 @@ const CAPTION_PIPELINE_STEPS: PipelineStep[] = [
         if (!usedCache) {
           await prepareTrimmedAudio(ctx.audio.audioFile, trimmedPath, cuts);
           try {
-            const fileBuffer = await readFile(trimmedPath);
-            await supabase.storage.from(env.resultsBucket).upload(cacheKey.storageKey, fileBuffer, {
+            const stats = await stat(trimmedPath);
+            const fileStream = createReadStream(trimmedPath);
+            await supabase.storage.from(env.resultsBucket).upload(cacheKey.storageKey, fileStream, {
               contentType: "audio/mpeg",
               cacheControl: "3600",
               upsert: true,
+              duplex: 'half',
             });
             await upsertMediaCache({
               kind: "trimmed_audio",
@@ -286,7 +289,7 @@ const CAPTION_PIPELINE_STEPS: PipelineStep[] = [
               storageKey: cacheKey.storageKey,
               mimeType: "audio/mpeg",
               durationMs: null,
-              sizeBytes: fileBuffer.byteLength,
+              sizeBytes: stats.size,
             });
           } catch (error) {
             console.warn(`[pipeline] Failed to cache trimmed audio for job ${job.id}`, error);

@@ -40,3 +40,19 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# temp/test files
+.next-playwright/
+test_result.log
+test_output_canvas.mp4
+test_error.log
+test.mp4
+test-video.mp4
+test-poc.png
+test-output/
+test-korean-font-output.png
+test-download.mp4
+dummy_input.mp4
+public/remotion-temp/
+-.mov
+

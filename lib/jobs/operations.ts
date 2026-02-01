@@ -436,13 +436,14 @@ export async function uploadVideoToStorage(media: DownloadedAudio): Promise<Uplo
     
     console.info(`[storage] Uploading source video: path=${objectPath}, contentType=${contentType}, size=${media.sizeBytes}`);
     
-    const fileBuffer = await readFile(media.audioFile);
+    const fileStream = createReadStream(media.audioFile);
     const { error } = await supabase.storage
       .from(env.resultsBucket)
-      .upload(objectPath, fileBuffer, {
+      .upload(objectPath, fileStream, {
         contentType,
         cacheControl: "3600",
         upsert: true,
+        duplex: 'half',
       });
 
     if (error) {
@@ -536,13 +537,19 @@ export async function applySubtitlesToVideo(
 
     const supabase = getSupabaseServer();
     const objectPath = `videos/${path.basename(outputPath)}`;
-    const fileBuffer = await readFile(outputPath);
+    
+    // Use stream to avoid OOM
+    const stats = await stat(outputPath);
+    console.info(`[caption] Uploading video: ${objectPath} (${(stats.size/1024/1024).toFixed(2)} MB)`);
+    
+    const fileStream = createReadStream(outputPath);
     const { error } = await supabase.storage
       .from(env.resultsBucket)
-      .upload(objectPath, fileBuffer, {
+      .upload(objectPath, fileStream, {
         contentType: media.mimeType ?? "video/mp4",
         cacheControl: "3600",
         upsert: true,
+        duplex: 'half',
       });
 
     if (error) {

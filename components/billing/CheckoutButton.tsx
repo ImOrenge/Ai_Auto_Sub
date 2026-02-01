@@ -32,7 +32,11 @@ export function CheckoutButton({ planId, isCurrent, className, children }: Check
             if (data.url) {
                 window.location.href = data.url;
             } else {
-                alert(data.error || "Failed to initiate checkout");
+                const errorMsg = data.detail
+                    ? (typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail))
+                    : (data.error || "Failed to initiate checkout");
+
+                alert(`Checkout Error: ${errorMsg}`);
                 setIsLoading(false);
             }
         } catch (error) {

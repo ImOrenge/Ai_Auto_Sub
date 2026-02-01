@@ -249,7 +249,7 @@ export async function renderSubtitleVideo(
         `-c:v ${encoder}`,
         ...(encoder === 'libx264' ? [
             '-preset veryfast',  // Better compression than superfast
-            '-crf 23',           // Standard quality for web video
+            `-crf ${process.env.RAILWAY_ENVIRONMENT ? '28' : '23'}`, // Higher CRF (28) on Railway for smaller files
             '-tune zerolatency', // Optimize for streaming
             '-threads 0'         // Use all available CPU cores
         ] : []),

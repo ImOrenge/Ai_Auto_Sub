@@ -19,19 +19,20 @@ export async function POST(
     }
 
     const supabase = getSupabaseServer();
-    const buffer = Buffer.from(await file.arrayBuffer());
+    const fileStream = file.stream();
     
     // Generate a unique path for the result
     const extension = file.name.split('.').pop() || 'mp4';
     const objectPath = `exports/${id}/${randomUUID()}.${extension}`;
 
-    console.info(`[api/upload-result] Uploading client render for job ${id} to ${objectPath}`);
+    console.info(`[api/upload-result] Uploading client render for job ${id} to ${objectPath} (Size: ${file.size} bytes)`);
 
     const { error: uploadError } = await supabase.storage
       .from(env.resultsBucket)
-      .upload(objectPath, buffer, {
+      .upload(objectPath, fileStream, {
         contentType: file.type || "video/mp4",
         upsert: true,
+        duplex: 'half',
       });
 
     if (uploadError) {
