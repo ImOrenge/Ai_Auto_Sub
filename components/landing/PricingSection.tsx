@@ -9,54 +9,50 @@ type Billing = "monthly" | "yearly";
 
 function priceLabel(plan: Plan, billing: Billing) {
     const p = billing === "monthly" ? plan.priceMonthly : plan.priceYearly;
-    if (plan.name === "Enterprise") return "Custom";
-    if (p === 0) return "Free";
     return `$${p}`;
 }
 
 // 플랜 비교표 데이터
 const COMPARISON_FEATURES = [
     {
-        category: "기본 기능",
+        category: "Credits & Core",
         features: [
-            { name: "AI STT 자막 생성", free: true, creator: true, pro: true, enterprise: true },
-            { name: "자막 편집기", free: true, creator: true, pro: true, enterprise: true },
-            { name: "SRT/VTT 내보내기", free: true, creator: true, pro: true, enterprise: true },
-            { name: "MP4 Burn-in 내보내기", free: false, creator: true, pro: true, enterprise: true },
+            { name: "Included Credits", starter: "330", pro: "660", plus: "1320", max: "1980" },
+            { name: "Sub Bonus", starter: "+10%", pro: "+10%", plus: "+10%", max: "+10%" },
+            { name: "Concurrent Exports", starter: "1", pro: "2", plus: "3", max: "5" },
+            { name: "Queue Priority", starter: "Standard", pro: "Standard", plus: "Priority", max: "Highest" },
         ]
     },
     {
-        category: "AI 기능",
+        category: "Output Quality",
         features: [
-            { name: "AI 번역", free: false, creator: true, pro: true, enterprise: true },
-            { name: "다국어 동시 번역", free: false, creator: false, pro: true, enterprise: true },
-            { name: "번역 언어 수", free: "-", creator: "10개", pro: "90+", enterprise: "90+" },
+            { name: "HD (720p)", starter: true, pro: true, plus: true, max: true },
+            { name: "FHD (1080p)", starter: true, pro: true, plus: true, max: true },
+            { name: "UHD (4K)", starter: false, pro: true, plus: true, max: true },
         ]
     },
     {
-        category: "처리량",
+        category: "Content & Templates",
         features: [
-            { name: "월간 처리 시간", free: "30분", creator: "300분", pro: "1,000분", enterprise: "무제한" },
-            { name: "동시 작업 수", free: "1개", creator: "3개", pro: "10개", enterprise: "무제한" },
-            { name: "최대 파일 크기", free: "500MB", creator: "2GB", pro: "5GB", enterprise: "무제한" },
+            { name: "Basic Templates", starter: true, pro: true, plus: true, max: true },
+            { name: "Premium Templates", starter: "Partial", pro: "Full", plus: "Full", max: "Full" },
+            { name: "Cinematic Templates", starter: false, pro: false, plus: "Partial", max: "Full" },
         ]
     },
     {
-        category: "고급 기능",
+        category: "Storage & Support",
         features: [
-            { name: "스타일 프리셋 저장", free: false, creator: true, pro: true, enterprise: true },
-            { name: "팀 협업", free: false, creator: false, pro: true, enterprise: true },
-            { name: "API 연동", free: false, creator: false, pro: true, enterprise: true },
-            { name: "전용 지원", free: false, creator: false, pro: "이메일", enterprise: "24/7" },
+            { name: "Storage Retention", starter: "7 Days", pro: "30 Days", plus: "60 Days", max: "90 Days" },
+            { name: "Priority Support", starter: false, pro: false, plus: true, max: true },
         ]
     },
 ];
 
 // 사용량 기준 설명
 const USAGE_INFO = [
-    { label: "처리 시간", desc: "영상 길이 기준으로 차감됩니다. 예: 10분 영상 = 10분 차감" },
-    { label: "동시 작업", desc: "동시에 처리할 수 있는 영상 수입니다. 대기열에는 무제한 추가 가능" },
-    { label: "파일 보관", desc: "Free 7일, Creator 30일, Pro 90일, Enterprise 무제한" },
+    { label: "Processing", desc: "자막 생성 및 번역 시 분당 0.2 크레딧이 소모됩니다." },
+    { label: "Export", desc: "렌더링 시 화질과 효과 티어에 따라 분당 크레딧이 차감됩니다." },
+    { label: "저장 기간", desc: "결과물은 플랜별로 7일에서 최대 90일까지 보관됩니다." },
 ];
 
 export default function PricingSection() {
@@ -191,14 +187,14 @@ export default function PricingSection() {
                     <table className="w-full border-collapse text-sm">
                         <thead>
                             <tr className="border-b border-border">
-                                <th className="text-left py-4 px-4 font-semibold min-w-[200px]">기능</th>
-                                <th className="text-center py-4 px-4 font-semibold">Free</th>
-                                <th className="text-center py-4 px-4 font-semibold">Creator</th>
+                                <th className="text-left py-4 px-4 font-semibold min-w-[200px]">Features</th>
+                                <th className="text-center py-4 px-4 font-semibold">Starter</th>
                                 <th className="text-center py-4 px-4 font-semibold bg-primary/5 rounded-t-lg">
                                     Pro
                                     <span className="ml-1 text-xs text-primary">(인기)</span>
                                 </th>
-                                <th className="text-center py-4 px-4 font-semibold">Enterprise</th>
+                                <th className="text-center py-4 px-4 font-semibold">Plus</th>
+                                <th className="text-center py-4 px-4 font-semibold">Max</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -212,10 +208,10 @@ export default function PricingSection() {
                                     {category.features.map((feature, featIdx) => (
                                         <tr key={`feat-${catIdx}-${featIdx}`} className="border-b border-border/50 hover:bg-muted/20">
                                             <td className="py-3 px-4">{feature.name}</td>
-                                            <td className="py-3 px-4 text-center">{renderValue(feature.free)}</td>
-                                            <td className="py-3 px-4 text-center">{renderValue(feature.creator)}</td>
-                                            <td className="py-3 px-4 text-center bg-primary/5">{renderValue(feature.pro)}</td>
-                                            <td className="py-3 px-4 text-center">{renderValue(feature.enterprise)}</td>
+                                            <td className="py-3 px-4 text-center">{renderValue((feature as any).starter)}</td>
+                                            <td className="py-3 px-4 text-center bg-primary/5">{renderValue((feature as any).pro)}</td>
+                                            <td className="py-3 px-4 text-center">{renderValue((feature as any).plus)}</td>
+                                            <td className="py-3 px-4 text-center">{renderValue((feature as any).max)}</td>
                                         </tr>
                                     ))}
                                 </>

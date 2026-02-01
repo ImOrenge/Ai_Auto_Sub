@@ -1,15 +1,15 @@
-export type PlanId = "free" | "creator" | "pro" | "enterprise";
+export type PlanId = "starter" | "pro" | "plus" | "max";
 
 export type BillingCycle = "monthly" | "yearly";
 
 export type SubscriptionStatus = "active" | "canceled" | "past_due" | "incomplete" | "trialing";
 
 export interface PlanLimits {
-  sttMinutes: number; // Monthly allowance
-  translationLanguages: number; // Max concurrent languages or total
-  concurrentJobs: number;
-  storageDays: number;
-  maxProjects: number;
+  monthlyCredits: number;
+  concurrentExports: number;
+  storageRetentionDays: number;
+  queuePriority: "standard" | "priority" | "highest";
+  templateAccess: "basic" | "premium" | "cinematic" | "all";
 }
 
 export interface PlanFeatures {
@@ -44,41 +44,34 @@ export interface Subscription {
 export interface EntitlementSummary {
   planName: string;
   
-  // STT Usage
-  stt: {
-    total: number; // Minutes
+  // Credit Usage
+  credits: {
+    total: number;
     used: number;
     remaining: number;
     isOverLimit: boolean;
   };
 
-  // Translation Usage (simplifying to language-count logic as per PRD "1개 언어", "5개 언어")
-  translation: {
-    allowedLanguages: number | "unlimited"; 
-  };
-  
   // Job Limits
   jobs: {
-    concurrentLimit: number;
+    concurrentExportsLimit: number;
     activeCount: number;
   };
   
-  projects: {
-    maxLimit: number;
-    currentCount: number;
+  storage: {
+    retentionDays: number;
   };
 
   // Feature Flags
   features: {
-    canRemoveWatermark: boolean;
-    hasPriorityProcessing: boolean;
-    hasApiAccess: boolean;
+    queuePriority: "standard" | "priority" | "highest";
+    templateAccess: "basic" | "premium" | "cinematic" | "all";
   };
 }
 
 // Usage Ledger (The "Source of Truth" for billing)
-export type LedgerMetric = "stt_minutes" | "translation_minutes" | "priority_fee";
-export type LedgerReason = "included" | "overage" | "promo" | "failed_job_void";
+export type LedgerMetric = "processing_credits" | "export_credits" | "priority_fee";
+export type LedgerReason = "included" | "overage" | "topup" | "bonus" | "adjustment";
 export type LedgerStatus = "posted" | "void" | "pending";
 
 export interface UsageLedgerItem {

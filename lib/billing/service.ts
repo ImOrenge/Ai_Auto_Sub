@@ -13,7 +13,13 @@ import { getSupabaseServer } from "../supabaseServer";
 import { env } from "../env";
 
 // Default fallback limits if DB fetch fails or for Free tier if no record exists
-const DEFAULT_FREE_LIMITS: PlanLimits = { sttMinutes: 30, translationLanguages: 0, concurrentJobs: 100, storageDays: 3, maxProjects: 3 };
+const DEFAULT_FREE_LIMITS: PlanLimits = { 
+  monthlyCredits: 0, 
+  concurrentExports: 1, 
+  storageRetentionDays: 7, 
+  queuePriority: "standard", 
+  templateAccess: "basic" 
+};
 const DEFAULT_FREE_FEATURES: PlanFeatures = { priority: false, apiAccess: false, watermark: true };
 
 export class BillingService {
@@ -49,7 +55,7 @@ export class BillingService {
     return {
       id: "sub_virtual_free",
       userId,
-      planId: "free",
+      planId: "starter",
       status: "active",
       cycle: "monthly",
       currentPeriodStart: startOfMonth,
@@ -80,7 +86,7 @@ export class BillingService {
     // Fallback if not found (should not happen if migration ran)
     // Return hardcoded Free config to prevent crash
     return {
-      id: "free",
+      id: "starter",
       name: "Free",
       priceMonthly: 0,
       priceYearly: 0,
@@ -106,9 +112,15 @@ export class BillingService {
       endDate: subscription.currentPeriodEnd 
     });
     
-    const usedStt = ledger
-      .filter(l => l.metric === "stt_minutes" && l.status === "posted")
+    const usedProcessing = ledger
+      .filter(l => l.metric === "processing_credits" && l.status === "posted")
       .reduce((acc, curr) => acc + curr.quantity, 0);
+
+    const usedExport = ledger
+      .filter(l => l.metric === "export_credits" && l.status === "posted")
+      .reduce((acc, curr) => acc + curr.quantity, 0);
+
+    const totalUsed = usedProcessing + usedExport;
 
     // Count active jobs (any status that is actually using processing resources)
     const { count: activeCount } = await supabase
@@ -117,35 +129,24 @@ export class BillingService {
       .eq('user_id', userId)
       .not('status', 'in', '("done","error","canceled","awaiting_edit","editing","ready_to_export")');
 
-    // Count projects
-    const { count: projectCount } = await supabase
-      .from('projects')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId);
-
     return {
       planName: planConfig.name,
-      stt: {
-        total: planConfig.limits.sttMinutes,
-        used: usedStt,
-        remaining: Math.max(0, planConfig.limits.sttMinutes - usedStt),
-        isOverLimit: usedStt >= planConfig.limits.sttMinutes
-      },
-      translation: {
-        allowedLanguages: planConfig.limits.translationLanguages === 99 ? "unlimited" : planConfig.limits.translationLanguages
+      credits: {
+        total: planConfig.limits.monthlyCredits,
+        used: totalUsed,
+        remaining: Math.max(0, planConfig.limits.monthlyCredits - totalUsed),
+        isOverLimit: totalUsed >= planConfig.limits.monthlyCredits
       },
       jobs: {
-        concurrentLimit: planConfig.limits.concurrentJobs,
+        concurrentExportsLimit: planConfig.limits.concurrentExports,
         activeCount: activeCount || 0
       },
-      projects: {
-        maxLimit: planConfig.limits.maxProjects,
-        currentCount: projectCount || 0
+      storage: {
+        retentionDays: planConfig.limits.storageRetentionDays
       },
       features: {
-        canRemoveWatermark: !planConfig.features.watermark,
-        hasPriorityProcessing: planConfig.features.priority,
-        hasApiAccess: planConfig.features.apiAccess
+        queuePriority: planConfig.limits.queuePriority,
+        templateAccess: planConfig.limits.templateAccess
       }
     };
   }
@@ -229,82 +230,71 @@ export class BillingService {
     const entitlements = await this.getEntitlements(userId);
     const sub = await this.getSubscription(userId); // Need period info for period_key
     
-    const minutes = Math.ceil(usage.durationSec / 60);
+    const videoMinutes = usage.durationSec / 60;
     const periodKey = `${sub.currentPeriodStart.getFullYear()}-${String(sub.currentPeriodStart.getMonth() + 1).padStart(2, '0')}`;
     
-    // Rates (Hardcoded for now, could be in DB)
-    const OVERAGE_RATE_STT = 30; // KRW per min per plan check
+    // helper rounding function
+    const ceil01 = (num: number) => Math.ceil(num * 10) / 10;
+
+    // Rates from Price_model.md
+    const PROCESSING_RATE = 0.20; // credits / min
     
+    // For Export, we need quality and template tier. 
+    // Mocking template and quality for now as they might come from job metadata or usage object.
+    // Assuming usage object is extended or we resolve from job.
+    const quality = (jobData as any)?.usage_metrics?.quality || 'FHD';
+    const tier = (jobData as any)?.usage_metrics?.tier || 'basic';
+
+    const QUALITY_RATES: Record<string, number> = {
+        'HD': 0.04,
+        'FHD': 0.08,
+        'UHD': 0.22,
+        '4K': 0.22
+    };
+
+    const TIER_MULTIPLIERS: Record<string, number> = {
+        'basic': 1.0,
+        'premium': 1.3,
+        'cinematic': 1.6
+    };
+
+    const qRate = QUALITY_RATES[quality] || 0.08;
+    const tMult = TIER_MULTIPLIERS[tier] || 1.0;
+
+    const processingCredits = ceil01(videoMinutes * PROCESSING_RATE);
+    const exportCredits = ceil01(videoMinutes * qRate * tMult);
+
     const ledgerEntries: any[] = [];
-    let totalCost = 0;
+    
+    // Processing Entry
+    ledgerEntries.push({
+        user_id: userId,
+        project_id: projectId,
+        job_id: jobId,
+        metric: 'processing_credits',
+        quantity: processingCredits,
+        unit_price: 0, // Deduct from monthly allowance or topup
+        amount: 0,
+        reason: 'included',
+        status: 'posted',
+        period_key: periodKey,
+        description: `Processing Credits - ${videoMinutes.toFixed(2)}m`
+    });
 
-    // --- STT Usage Logic ---
-    let sttIncluded = 0;
-    let sttOverage = 0;
-
-    // entitlements.stt.remaining is the unused amount of the base quota
-    const remaining = entitlements.stt.remaining;
-
-    if (remaining >= minutes) {
-        // Fully covered by included quota
-        sttIncluded = minutes;
-    } else {
-        // Partially covered or fully overage
-        sttIncluded = remaining;
-        sttOverage = minutes - remaining;
-    }
-
-    if (sttIncluded > 0) {
-        ledgerEntries.push({
-            user_id: userId,
-            project_id: projectId,
-            job_id: jobId,
-            metric: 'stt_minutes',
-            quantity: sttIncluded,
-            unit_price: 0,
-            amount: 0,
-            reason: 'included',
-            status: 'posted',
-            period_key: periodKey,
-            description: `STT (Included) - ${sttIncluded}m`
-        });
-    }
-
-    if (sttOverage > 0) {
-        const cost = sttOverage * OVERAGE_RATE_STT;
-        totalCost += cost;
-        ledgerEntries.push({
-            user_id: userId,
-            project_id: projectId,
-            job_id: jobId,
-            metric: 'stt_minutes',
-            quantity: sttOverage,
-            unit_price: OVERAGE_RATE_STT,
-            amount: cost,
-            reason: 'overage',
-            status: 'posted',
-            period_key: periodKey,
-            description: `STT Overage - ${sttOverage}m`
-        });
-    }
-
-    // --- Translation Usage Logic ---
-    if (usage.translationCount > 0) {
-        const transQuantity = minutes * usage.translationCount;
-        ledgerEntries.push({
-            user_id: userId,
-            project_id: projectId,
-            job_id: jobId,
-            metric: 'translation_minutes',
-            quantity: transQuantity,
-            unit_price: 0, 
-            amount: 0,
-            reason: 'included',
-            status: 'posted',
-            period_key: periodKey,
-            description: `Translation (${usage.translationCount} langs)`
-        });
-    }
+    // Export Entry
+    ledgerEntries.push({
+        user_id: userId,
+        project_id: projectId,
+        job_id: jobId,
+        metric: 'export_credits',
+        quantity: exportCredits,
+        unit_price: 0,
+        amount: 0,
+        reason: 'included',
+        status: 'posted',
+        period_key: periodKey,
+        description: `Export Credits (${quality}/${tier}) - ${videoMinutes.toFixed(2)}m`
+    });
 
     // Batch Insert Ledger
     if (ledgerEntries.length > 0) {
@@ -321,8 +311,9 @@ export class BillingService {
         console.log('[BillingService] No ledger entries to insert (duration 0?)');
     }
 
-    // Update Job with Cost
-    const { error: jobError } = await supabase.from('jobs').update({ cost: totalCost }).eq('id', jobId);
+    // Update Job with Cost (Total credits used for this job)
+    const totalCredits = processingCredits + exportCredits;
+    const { error: jobError } = await supabase.from('jobs').update({ cost: totalCredits }).eq('id', jobId);
     if (jobError) {
         console.error('[BillingService] Job Update Error:', jobError);
         throw jobError;
