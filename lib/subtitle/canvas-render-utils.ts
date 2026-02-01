@@ -453,12 +453,14 @@ export const renderSubtitleFrame = (
     
     // Map common Korean font names to Noto Sans KR (which is registered in node-renderer)
     const fontMapping: Record<string, string> = {
-        'NanumGothic': 'Noto Sans KR',
-        'NanumBarunGothic': 'Noto Sans KR',
+        'NanumGothic': 'Nanum Gothic',
+        'NanumBarunGothic': 'Nanum Gothic',
         'Malgun Gothic': 'Noto Sans KR',
         'Apple SD Gothic Neo': 'Noto Sans KR',
         '맑은 고딕': 'Noto Sans KR',
-        '나눔고딕': 'Noto Sans KR',
+        '나눔고딕': 'Nanum Gothic',
+        'NanumMyeongjo': 'Nanum Myeongjo',
+        '나눔명조': 'Nanum Myeongjo',
     };
     
     const mappedFontName = fontMapping[fontName] || fontName;
