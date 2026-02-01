@@ -20,6 +20,7 @@ export type PricingPlan = {
     condition?: string; // For logic if needed, but easier to handle in component
   };
   emphasis: "Low" | "Medium" | "High";
+  polarProductId?: string;
 };
 
 export const pricingPlans: PricingPlan[] = [
@@ -42,6 +43,7 @@ export const pricingPlans: PricingPlan[] = [
       href: "/signup?from=pricing&plan=free",
     },
     emphasis: "Low",
+    polarProductId: undefined, // Free plan doesn't need checkout
   },
   {
     id: "creator",
@@ -64,6 +66,7 @@ export const pricingPlans: PricingPlan[] = [
       href: "/signup?from=pricing&plan=creator",
     },
     emphasis: "Medium",
+    polarProductId: "prod_creator_placeholder", // Replace with real ID
   },
   {
     id: "pro",
@@ -90,6 +93,7 @@ export const pricingPlans: PricingPlan[] = [
       href: "/signup?from=pricing&plan=pro",
     },
     emphasis: "High",
+    polarProductId: "prod_pro_placeholder", // Replace with real ID
   },
   {
     id: "enterprise",
@@ -111,6 +115,7 @@ export const pricingPlans: PricingPlan[] = [
       href: "/contact?from=pricing",
     },
     emphasis: "Medium",
+    polarProductId: undefined, // Enterprise usually custom
   },
 ];
 

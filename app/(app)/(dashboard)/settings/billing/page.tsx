@@ -12,6 +12,7 @@ import {
     Check,
     AlertCircle,
 } from "lucide-react";
+import { CheckoutButton } from "@/components/billing/CheckoutButton";
 import { pricingPlans } from "@/lib/pricing";
 import { cn, MOCK_USER_ID } from "@/lib/utils";
 import { BillingService } from "@/lib/billing/service";
@@ -214,19 +215,19 @@ export default async function BillingPage() {
                                     <li className="text-xs text-muted-foreground pt-1">+ more</li>
                                 )}
                             </ul>
-                            <button
-                                type="button"
+                            <CheckoutButton
+                                planId={plan.id}
+                                isCurrent={plan.id === subscription.planId}
                                 className={cn(
-                                    "mt-6 inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition",
+                                    "mt-6 inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition w-full h-10",
                                     plan.id === subscription.planId
                                         ? "border border-border text-muted-foreground cursor-not-allowed"
-                                        : "bg-primary text-primary-foreground hover:opacity-90"
+                                        : "bg-primary text-primary-foreground hover:opacity-90 active:scale-95"
                                 )}
-                                disabled={plan.id === subscription.planId}
                             >
-                                {plan.id === subscription.planId ? "Current Plan" : "Downgrade / Upgrade"}
+                                {plan.id === subscription.planId ? "Current Plan" : (plan.id === 'free' ? 'Downgrade' : 'Upgrade')}
                                 {plan.id !== subscription.planId && <ArrowRight className="size-4" />}
-                            </button>
+                            </CheckoutButton>
                         </article>
                     ))}
                 </div>
