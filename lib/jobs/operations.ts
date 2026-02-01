@@ -481,11 +481,18 @@ export async function applySubtitlesToVideo(
   console.info(`[caption]   filename: ${media.filename}`);
   console.info(`[caption]   audioFile: ${media.audioFile}`);
   
+  // Auto-select optimal resolution for short-form content
+  if (!resolution && aspectRatio === '9:16' && media.durationMs && media.durationMs < 120000) {
+    resolution = '1080p'; // Standard for Instagram Reels/TikTok
+    console.info(`[caption] Auto-selected 1080p for short-form vertical content (${Math.round(media.durationMs/1000)}s)`);
+  }
+  
   const videoLike = isVideoLike(media.mimeType, media.filename, media.audioFile);
   console.info(`[caption]   isVideoLike: ${videoLike}`);
   console.info(`[caption]   cues available: ${!!cues} (count: ${cues?.length ?? 0})`);
   console.info(`[caption]   config available: ${!!subtitleConfig}`);
   console.info(`[caption]   aspectRatio: ${aspectRatio || 'original'}`);
+  console.info(`[caption]   resolution: ${resolution || 'original'}`);
   
   if (!videoLike) {
     console.warn(`[caption] Skipping video rendering - not a video file`);

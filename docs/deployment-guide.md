@@ -124,7 +124,18 @@ Settings > Variables 탭에서 다음 변수들을 추가합니다:
    - 비디오 렌더링을 위해 최소 **2 vCPU / 4GB RAM** 이상을 권장합니다.
    - 부하가 많을 경우 Cloud Run 사양인 **8 vCPU / 32GB RAM**까지 늘릴 수 있습니다.
 
-## 4. 배포
+## 4. Supabase 인증 설정 (OAuth)
+로그인 및 리다이렉트가 정상 작동하려면 Supabase 대시보드에서 다음 설정을 업데이트해야 합니다:
+
+1. **Site URL**: `https://<your-railway-app>.up.railway.app`
+2. **Redirect URLs**:
+   - `https://<your-railway-app>.up.railway.app/**`
+   - `http://localhost:3000/**` (로컬 테스트용)
+
+> [!NOTE]
+> `<your-railway-app>`은 Railway의 **Settings > Networking**에서 확인할 수 있는 도메인 주소로 변경하세요.
+
+## 5. 배포
 저장소의 `master` 브랜치에 코드를 푸시하면 Railway가 자동으로 `railpack.json`을 사용하여 빌드 및 배포를 진행합니다.
 
 > [!TIP]

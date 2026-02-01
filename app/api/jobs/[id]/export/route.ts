@@ -91,6 +91,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (format === "mp4") {
       const sourceUrl = resolveCachedSourceUrl(job.url, job.result_video_url);
       
+      // Save export settings to job for historical tracking
+      await supabase
+        .from("jobs")
+        .update({
+          export_settings: {
+            resolution,
+            aspectRatio: captionData.videoAspectRatio,
+            exportedAt: new Date().toISOString(),
+            renderer
+          }
+        })
+        .eq("id", id);
+      
       // FIRE AND FORGET: Start the potentially long-running render in the background
       void handleMp4Export(id, sourceUrl, captionData, style, supabase, job.user_id, job.cuts, job.sequence, resolution, renderer, captionData.videoAspectRatio);
       
@@ -260,11 +273,17 @@ async function handleMp4Export(
 
     console.info(`[export/mp4] Video export completed for job ${jobId}`);
 
+    // Generate filename with date and resolution
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0].replace(/-/g, ''); // YYYYMMDD
+    const resolutionLabel = resolution ? `_${resolution}` : '';
+    const filename = `video_${dateStr}${resolutionLabel}_${jobId.slice(0, 8)}.mp4`;
+
     return NextResponse.json({
       success: true,
       downloadUrl: captionedVideo.publicUrl,
       format: "mp4",
-      filename: `video_${jobId.slice(0, 8)}.mp4`,
+      filename,
     });
   } catch (err) {
     console.error("[export/mp4] Error:", err);

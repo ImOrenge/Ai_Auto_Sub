@@ -4,6 +4,7 @@ import { JobRecord } from "@/lib/jobs/types";
 import { FileVideo, CheckCircle2, Clock, XCircle, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { useHasMounted } from "@/hooks/use-has-mounted";
 
 interface RecentActivityListProps {
     jobs: JobRecord[];
@@ -11,6 +12,8 @@ interface RecentActivityListProps {
 }
 
 export function RecentActivityList({ jobs, projectId }: RecentActivityListProps) {
+    const hasMounted = useHasMounted();
+
     if (jobs.length === 0) {
         return (
             <div className="p-8 text-center border border-dashed rounded-none bg-muted/30">
@@ -51,7 +54,7 @@ export function RecentActivityList({ jobs, projectId }: RecentActivityListProps)
                                     job.status === "error" && "text-red-600"
                                 )}>{job.status}</span>
                                 <span>•</span>
-                                <span>{new Date(job.createdAt).toLocaleString()}</span>
+                                <span>{hasMounted ? new Date(job.createdAt).toLocaleString() : ""}</span>
                             </div>
                         </div>
 

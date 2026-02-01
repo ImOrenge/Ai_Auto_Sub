@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { X, CheckCircle2, Clock, AlertCircle, Download, FileText, Play, Pencil, ArrowRight } from "lucide-react";
 import { JobRecord } from "@/lib/jobs/types";
 import Link from "next/link";
+import { useHasMounted } from "@/hooks/use-has-mounted";
 
 type JobDetailDrawerProps = {
     job: JobRecord | null;
@@ -171,11 +172,12 @@ export function JobDetailDrawer({ job, onClose, projectId }: JobDetailDrawerProp
 }
 
 function TimelineItem({ date, label, active, isLast }: any) {
+    const hasMounted = useHasMounted();
     return (
         <div className="relative">
             <div className={cn("absolute -left-[21px] size-3 rounded-full border-2 bg-background", active ? "border-primary bg-primary" : "border-muted")} />
             <p className={cn("text-sm font-medium leading-none", active ? "text-foreground" : "text-muted-foreground")}>{label}</p>
-            <p className="text-xs text-muted-foreground mt-1">{new Date(date).toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground mt-1">{hasMounted ? new Date(date).toLocaleString() : ""}</p>
         </div>
     )
 }

@@ -1,20 +1,114 @@
 
-// import { createCanvas } from '@napi-rs/canvas'; // Changed to dynamic import to prevent top-level crash
 import ffmpeg from 'fluent-ffmpeg';
 import { SubtitleCue, SubtitleConfig } from '../jobs/types';
-import { EffectPreset, getEffectPreset } from '../subtitle-definitions';
+import { getEffectPreset } from '../subtitle-definitions';
 import { renderSubtitleFrame } from '../subtitle/canvas-render-utils';
 import { PassThrough } from 'stream';
 import path from 'path';
+import os from 'os';
+import { Worker, isMainThread, parentPort, workerData } from 'worker_threads';
+import { getSupabaseServer } from '../supabaseServer';
 
+/**
+ * Cache key for subtitle frame state to detect when frames can be reused
+ */
+function getFrameCacheKey(cues: any[], style: any, time: number): string {
+  const activeCues = cues.filter((c: any) => time >= c.startTime && time <= c.endTime);
+  if (activeCues.length === 0) return 'empty';
+  
+  return JSON.stringify({
+    texts: activeCues.map((c: any) => c.text),
+    styles: [style.primaryColor, style.fontSize, style.effect]
+  });
+}
+
+// Worker Logic
+if (!isMainThread) {
+  const runWorker = async () => {
+    const {
+      cues,
+      style,
+      width,
+      height,
+      fps,
+      startFrame,
+      endFrame,
+    } = workerData;
+
+    let createCanvas: any;
+    let GlobalFonts: any;
+    
+    try {
+      const canvasModule = await import('@napi-rs/canvas');
+      createCanvas = canvasModule.createCanvas;
+      GlobalFonts = canvasModule.GlobalFonts;
+    } catch (e: any) {
+      parentPort?.postMessage({ type: 'error', error: `Failed to load Canvas in worker: ${e.message}` });
+      return;
+    }
+
+    const canvas = createCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+
+    // Register Fonts
+    if (GlobalFonts) {
+      const fontPath = path.join(process.cwd(), 'lib/render/fonts/Anton-Regular.ttf');
+      try {
+        GlobalFonts.registerFromPath(fontPath, 'Anton');
+      } catch (err) {
+          // Ignore font errors in worker if they were already logged in main
+      }
+    }
+
+    const presetId = style.effect;
+    const preset = presetId ? getEffectPreset(presetId) : undefined;
+    let lastFrameKey: string | null = null;
+    let lastFrameBuffer: Buffer | null = null;
+
+    for (let i = startFrame; i < endFrame; i++) {
+        const time = i / fps;
+        
+        // Skip rendering if subtitle state hasn't changed (frame caching)
+        const frameKey = getFrameCacheKey(cues, style, time);
+        if (frameKey === lastFrameKey && lastFrameBuffer) {
+            parentPort?.postMessage({ type: 'frame', frameIndex: i, buffer: lastFrameBuffer });
+            continue;
+        }
+        
+        ctx.clearRect(0, 0, width, height);
+
+        const activeCues = cues.filter((c: any) => time >= c.startTime && time <= c.endTime);
+
+        for (const cue of activeCues) {
+            renderSubtitleFrame(ctx, cue, style, time, preset, width, height);
+        }
+
+        const imageData = ctx.getImageData(0, 0, width, height);
+        // Copy the data as a Buffer to avoid issues with native memory transfer
+        const buffer = Buffer.from(imageData.data);
+        lastFrameKey = frameKey;
+        lastFrameBuffer = buffer;
+        
+        parentPort?.postMessage({ type: 'frame', frameIndex: i, buffer });
+    }
+
+    parentPort?.postMessage({ type: 'done' });
+  };
+
+  runWorker().catch(err => {
+    parentPort?.postMessage({ type: 'error', error: err.message });
+  });
+}
+
+// Main Thread Logic
 interface RenderOptions {
   width?: number;
   height?: number;
   fps?: number;
-  duration?: number; // seconds
-  jobId?: string; // For progress updates
-  resolution?: string; // e.g. 'sd', 'hd', 'fhd', 'uhd'
-  aspectRatio?: 'original' | '9:16' | '1:1' | '16:9'; // Target aspect ratio from editor
+  duration?: number;
+  jobId?: string;
+  resolution?: string;
+  aspectRatio?: 'original' | '9:16' | '1:1' | '16:9';
 }
 
 const RESOLUTION_MAP: Record<string, { width: number; height: number }> = {
@@ -22,19 +116,46 @@ const RESOLUTION_MAP: Record<string, { width: number; height: number }> = {
   hd: { width: 1280, height: 720 },
   fhd: { width: 1920, height: 1080 },
   uhd: { width: 3840, height: 2160 },
-  "720p": { width: 1280, height: 720 }, // Backward compatibility
-  "1080p": { width: 1920, height: 1080 }, // Backward compatibility
-  "4k": { width: 3840, height: 2160 }, // Backward compatibility
+  "720p": { width: 1280, height: 720 },
+  "1080p": { width: 1920, height: 1080 },
+  "4k": { width: 3840, height: 2160 },
 };
 
-// Aspect ratio presets - dimensions optimized for each ratio
 const ASPECT_RATIO_MAP: Record<string, { width: number; height: number }> = {
   "9:16": { width: 1080, height: 1920 },
   "1:1": { width: 1080, height: 1080 },
   "16:9": { width: 1920, height: 1080 },
 };
 
-import { getSupabaseServer } from '../supabaseServer';
+/**
+ * Detects available hardware encoders and returns the best one.
+ * Falls back to libx264 (CPU) if none found or in Railway.
+ */
+async function getBestEncoder(): Promise<string> {
+    // Railway check - typically no GPU available
+    if (process.env.RAILWAY_ENVIRONMENT) {
+        return 'libx264';
+    }
+
+    return new Promise((resolve) => {
+        ffmpeg.getAvailableEncoders((err, encoders) => {
+            if (err) {
+                resolve('libx264');
+                return;
+            }
+
+            // Priority list for H.264 harware encoders
+            const priority = ['h264_nvenc', 'h264_qsv', 'h264_amf', 'h264_vaapi', 'h264_videotoolbox'];
+            for (const name of priority) {
+                if (encoders[name]) {
+                    console.info(`[node-renderer] Detected hardware encoder: ${name}`);
+                    return resolve(name);
+                }
+            }
+            resolve('libx264');
+        });
+    });
+}
 
 export async function renderSubtitleVideo(
   sourceVideoPath: string,
@@ -43,15 +164,12 @@ export async function renderSubtitleVideo(
   style: SubtitleConfig,
   options: RenderOptions = {}
 ): Promise<void> {
-  // 1. Determine Video Specs (if not provided)
   let { width, height, fps, duration, resolution, aspectRatio } = options;
 
-  // Aspect ratio takes priority over resolution for output dimensions
   if (aspectRatio && aspectRatio !== 'original' && ASPECT_RATIO_MAP[aspectRatio]) {
     const target = ASPECT_RATIO_MAP[aspectRatio];
     width = target.width;
     height = target.height;
-    console.info(`[node-renderer] Using aspect ratio ${aspectRatio}: ${width}x${height}`);
   } else if (resolution && RESOLUTION_MAP[resolution.toLowerCase()]) {
     const target = RESOLUTION_MAP[resolution.toLowerCase()];
     width = target.width;
@@ -69,70 +187,22 @@ export async function renderSubtitleVideo(
     const videoStream = metadata.streams.find((s) => s.codec_type === 'video');
     if (!videoStream) throw new Error('No video stream found in source');
 
-    if (!width || !height) {
-      width = width || videoStream.width || 1920;
-      height = height || videoStream.height || 1080;
-    }
-    
-    // FPS parsing (e.g. "30/1" or "30")
-    if (!fps) {
-        if (videoStream.r_frame_rate) {
-            const parts = videoStream.r_frame_rate.split('/');
-            fps = parts.length === 2 ? parseInt(parts[0]) / parseInt(parts[1]) : Number(videoStream.r_frame_rate);
-        } else {
-            fps = 60;
-        }
-    }
-
-    // Force 60fps for animations as requested by user
-    fps = 60;
-    
-    // Duration
-    if (!duration) {
-        duration = videoStream.duration ? parseFloat(videoStream.duration) : 0;
-        if (!duration && metadata.format.duration) {
-            duration = Number(metadata.format.duration);
-        }
-    }
+    width = width || videoStream.width || 1920;
+    height = height || videoStream.height || 1080;
+    fps = fps || 30; // Optimized for short-form content (2x faster rendering)
+    duration = duration || (videoStream.duration ? parseFloat(videoStream.duration) : Number(metadata.format.duration || 0));
   }
 
   if (!duration) throw new Error('Could not determine video duration');
 
-  console.info(`[node-renderer] Specs: ${String(width)}x${String(height)} @ ${String(fps)}fps, ${String(duration)}s`);
+  const totalFrames = Math.ceil(duration * fps);
+  console.info(`[node-renderer] Specs: ${width}x${height} @ ${fps}fps, ${duration}s, ${totalFrames} frames`);
 
-  // 2. Setup Canvas (Dynamic Import)
-  let createCanvas: any;
-  let GlobalFonts: any;
-  try {
-     const canvasModule = await import('@napi-rs/canvas');
-     createCanvas = canvasModule.createCanvas;
-     GlobalFonts = canvasModule.GlobalFonts;
-     
-     // Attempt to load system fonts for Windows (Malgun Gothic)
-     // Skia generally finds them, but we can be explicit if we find a path.
-     // For now, Skia's default font manager should handle system fonts.
-     console.log("[node-renderer] GlobalFonts available:", !!GlobalFonts);
-  } catch (e: any) {
-     console.error("Failed to load @napi-rs/canvas", e);
-     throw new Error(`Failed to load Canvas rendering engine: ${e.message}`);
-  }
-
-  const canvas = createCanvas(width, height);
-  const ctx = canvas.getContext('2d');
-
-  // Register Fonts
-  if (GlobalFonts) {
-    const fontPath = path.join(process.cwd(), 'lib/render/fonts/Anton-Regular.ttf');
-    try {
-      const success = GlobalFonts.registerFromPath(fontPath, 'Anton');
-      console.log(`[node-renderer] Font registration 'Anton': ${String(success)}`);
-    } catch (err) {
-      console.warn(`[node-renderer] Could not register font at ${fontPath}`, err);
-    }
-  }
-
+  const encoder = await getBestEncoder();
+  
   // 3. Setup Stream
   const subtitleStream = new PassThrough();
+  subtitleStream.setMaxListeners(0); // Unlimited for parallel rendering backpressure
   
   // 4. Setup FFmpeg Command
   const command = ffmpeg()
@@ -151,106 +221,160 @@ export async function renderSubtitleVideo(
     .outputOptions([
         '-map [outv]',
         '-map 0:a?',
-        '-c:v libx264',
-        '-preset veryfast',
-        '-crf 18',
+        `-c:v ${encoder}`,
+        ...(encoder === 'libx264' ? [
+            '-preset veryfast',  // Better compression than superfast
+            '-crf 23',           // Standard quality for web video
+            '-tune zerolatency', // Optimize for streaming
+            '-threads 0'         // Use all available CPU cores
+        ] : []),
         '-pix_fmt yuv420p',
-        '-r 60',
+        `-r ${fps}`,
         '-movflags +faststart'
     ])
     .output(outputVideoPath.replaceAll("\\", "/"));
 
-  // 5. Start FFmpeg
   const ffmpegPromise = new Promise<void>((resolve, reject) => {
     command
-      .on('start', (cmdLine) => console.log('Spawned Ffmpeg with command: ' + cmdLine))
+      .on('start', (cmdLine) => console.log('[node-renderer] FFmpeg command: ' + cmdLine))
       .on('error', (err) => {
-          console.error('Ffmpeg error:', err);
+          console.error('[node-renderer] FFmpeg error:', err);
           reject(err);
       })
       .on('end', () => {
-          console.log('Ffmpeg finished');
+          console.log('[node-renderer] FFmpeg finished');
           resolve();
       })
       .run();
   });
 
-  // 6. Generate Frames Loop
-  const totalFrames = Math.ceil(duration * fps);
-  
-  // We need to resolve style effect preset
-  const presetId = style.effect;
-  const preset = presetId ? getEffectPreset(presetId) : undefined;
-  
-  console.log(`[node-renderer] Rendering ${totalFrames} frames...`);
+  // 6. Parallel Frame Generation
+  const generateFramesParallel = async () => {
+    // For short videos, fewer workers = less overhead
+    const optimalWorkers = duration < 60 ? Math.min(2, os.cpus().length) : Math.min(4, os.cpus().length);
+    const numWorkers = Math.max(1, optimalWorkers);
+    console.info(`[node-renderer] Spawning ${numWorkers} workers...`);
 
-  const generateFrames = async () => {
+    const frameBuffers: (Buffer | null)[] = new Array(totalFrames).fill(null);
+    let nextFrameToWrite = 0;
+    let framesProcessed = 0;
     let lastProgressUpdate = 0;
     const { jobId } = options;
-    console.log(`[node-renderer] starting frame generation. jobId: ${jobId}, totalFrames: ${totalFrames}`);
+
+    const workers: Worker[] = [];
+    const framesPerWorker = Math.ceil(totalFrames / numWorkers);
+
+    const workerPromises = Array.from({ length: numWorkers }).map((_, i) => {
+      const startFrame = i * framesPerWorker;
+      const endFrame = Math.min(startFrame + framesPerWorker, totalFrames);
+
+      if (startFrame >= totalFrames) return Promise.resolve();
+
+      return new Promise<void>((resolve, reject) => {
+        const useTsx = __filename.endsWith('.ts');
+        const workerCode = useTsx 
+            ? `require('tsx/cjs'); require('${__filename.replaceAll('\\', '/')}');`
+            : __filename;
+        
+        const worker = new Worker(workerCode, {
+          eval: useTsx,
+          workerData: { cues, style, width, height, fps, startFrame, endFrame },
+          execArgv: process.execArgv 
+        });
+
+        worker.on('message', async (msg) => {
+          if (msg.type === 'frame') {
+            frameBuffers[msg.frameIndex] = msg.buffer;
+            
+            // Push frames to FFmpeg as they become available in order
+            while (nextFrameToWrite < totalFrames && frameBuffers[nextFrameToWrite]) {
+              const buffer = frameBuffers[nextFrameToWrite]!;
+              const canContinue = subtitleStream.write(buffer);
+              frameBuffers[nextFrameToWrite] = null; // Memory management
+              nextFrameToWrite++;
+              framesProcessed++;
+
+              if (!canContinue) {
+                await new Promise<void>(res => subtitleStream.once('drain', res));
+              }
+
+              // Update progress periodically
+              const ratio = framesProcessed / totalFrames;
+              if (jobId && (ratio - lastProgressUpdate >= 0.05 || framesProcessed === totalFrames)) {
+                  lastProgressUpdate = ratio;
+                  const progress = Math.min(0.99, ratio);
+                  getSupabaseServer().from("jobs").update({ progress }).eq("id", jobId)
+                      .then(({ error }) => error && console.error(`[node-renderer] Progress update error:`, error));
+              }
+
+              if (framesProcessed % (fps * 10) === 0 || framesProcessed === totalFrames) {
+                 console.log(`[node-renderer] Render Progress: ${(ratio * 100).toFixed(1)}%`);
+              }
+            }
+          } else if (msg.type === 'error') {
+            reject(new Error(msg.error));
+          } else if (msg.type === 'done') {
+            resolve();
+          }
+        });
+
+        worker.on('error', reject);
+        worker.on('exit', (code) => {
+          if (code !== 0) reject(new Error(`Worker stopped with exit code ${code}`));
+        });
+
+        workers.push(worker);
+      });
+    });
 
     try {
-        for (let i = 0; i < totalFrames; i++) {
-            const time = i / fps;
-            
-            // Render Frame
-            ctx.clearRect(0, 0, width, height);
-
-            const activeCues = cues.filter(c => time >= c.startTime && time <= c.endTime);
-
-            for (const cue of activeCues) {
-                renderSubtitleFrame(ctx, cue, style, time, preset, width, height);
-            }
-
-            // Memory Optimization: Use getImageData which is faster than PNG encoding
-            // though still involves a copy. 
-            const imageData = ctx.getImageData(0, 0, width, height);
-            const buffer = Buffer.from(imageData.data.buffer);
-            
-            // Write to stream
-            const canContinue = subtitleStream.write(buffer);
-            
-            if (!canContinue) {
-                // Backpressure handling
-                await new Promise<void>(resolve => subtitleStream.once('drain', resolve));
-            }
-
-            // Yield to event loop periodically to prevent freezing and allow heartbeats
-            if (i % 30 === 0) {
-                await new Promise(resolve => setImmediate(resolve));
-            }
-
-            // Progress tracking
-            const ratio = (i + 1) / totalFrames;
-            if (jobId && (ratio - lastProgressUpdate >= 0.01 || i === totalFrames - 1)) {
-                lastProgressUpdate = ratio;
-                const progress = Math.min(0.99, ratio);
-                
-                try {
-                    const { error } = await getSupabaseServer()
-                        .from("jobs")
-                        .update({ progress })
-                        .eq("id", jobId);
-                    
-                    if (error) {
-                        console.error(`[node-renderer] Failed to update DB progress:`, error);
-                    }
-                } catch (err) {
-                    console.error(`[node-renderer] Exception during DB progress update:`, err);
-                }
-            }
-
-            if (i % (fps * 5) === 0 || i === totalFrames - 1) {
-               console.log(`[node-renderer] Progress: ${((i / totalFrames) * 100).toFixed(1)}%`);
-            }
-        }
-        subtitleStream.end();
+      await Promise.all(workerPromises);
+      subtitleStream.end();
     } catch (err) {
-        console.error('Error in frame generation loop:', err);
-        subtitleStream.destroy(err as Error);
+      console.warn('[node-renderer] Worker pool failed, falling back to sequential rendering:', err);
+      workers.forEach(w => w.terminate());
+      
+      // FALLBACK: Sequential Rendering
+      try {
+          // Re-initialize canvas for main thread
+          const canvasModule = await import('@napi-rs/canvas');
+          const canvas = canvasModule.createCanvas(width, height);
+          const ctx = canvas.getContext('2d');
+          
+          if (canvasModule.GlobalFonts) {
+              const fontPath = path.join(process.cwd(), 'lib/render/fonts/Anton-Regular.ttf');
+              try { canvasModule.GlobalFonts.registerFromPath(fontPath, 'Anton'); } catch (e) {}
+          }
+
+          const presetId = style.effect;
+          const preset = presetId ? getEffectPreset(presetId) : undefined;
+
+          for (let i = framesProcessed; i < totalFrames; i++) {
+              const time = i / fps;
+              ctx.clearRect(0, 0, width, height);
+              const activeCues = cues.filter(c => time >= c.startTime && time <= c.endTime);
+              for (const cue of activeCues) {
+                  renderSubtitleFrame(ctx, cue, style, time, preset, width, height);
+              }
+              const imageData = ctx.getImageData(0, 0, width, height);
+              const buffer = Buffer.from(imageData.data);
+              const canWrite = subtitleStream.write(buffer);
+              if (!canWrite) await new Promise(res => subtitleStream.once('drain', res));
+              
+              if (i % (fps * 10) === 0) {
+                  const ratio = (i + 1) / totalFrames;
+                  if (jobId) getSupabaseServer().from("jobs").update({ progress: Math.min(0.99, ratio) }).eq("id", jobId).then(() => {});
+                  console.log(`[node-renderer] Fallback Progress: ${(ratio * 100).toFixed(1)}%`);
+              }
+          }
+          subtitleStream.end();
+      } catch (fallbackErr) {
+          console.error('[node-renderer] Fallback also failed:', fallbackErr);
+          subtitleStream.destroy(fallbackErr as Error);
+          throw fallbackErr;
+      }
     }
   };
 
-  // Run generation and ffmpeg in parallel
-  await Promise.all([ffmpegPromise, generateFrames()]);
+  await Promise.all([ffmpegPromise, generateFramesParallel()]);
 }

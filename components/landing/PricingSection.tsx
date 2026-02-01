@@ -99,8 +99,8 @@ export default function PricingSection() {
                     <button
                         onClick={() => setBilling("monthly")}
                         className={`px-4 py-2 text-sm rounded-full transition-colors ${billing === "monthly"
-                                ? "bg-background text-foreground shadow-sm"
-                                : "text-muted-foreground hover:text-foreground"
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
                             }`}
                     >
                         월간
@@ -108,8 +108,8 @@ export default function PricingSection() {
                     <button
                         onClick={() => setBilling("yearly")}
                         className={`px-4 py-2 text-sm rounded-full transition-colors ${billing === "yearly"
-                                ? "bg-background text-foreground shadow-sm"
-                                : "text-muted-foreground hover:text-foreground"
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
                             }`}
                     >
                         연간
@@ -126,8 +126,8 @@ export default function PricingSection() {
                     <div
                         key={p.name}
                         className={`relative rounded-2xl border p-6 transition-all hover:shadow-lg ${p.recommended
-                                ? "border-primary bg-primary/5 shadow-md"
-                                : "border-border bg-card hover:border-primary/30"
+                            ? "border-primary bg-primary/5 shadow-md"
+                            : "border-border bg-card hover:border-primary/30"
                             }`}
                     >
                         {p.recommended && (
@@ -164,8 +164,8 @@ export default function PricingSection() {
                         <Link
                             href={p.ctaHref}
                             className={`w-full inline-flex items-center justify-center px-4 py-3 text-sm font-semibold rounded-xl transition-colors ${p.recommended
-                                    ? "bg-primary text-primary-foreground hover:opacity-90"
-                                    : "border border-border bg-background hover:bg-muted"
+                                ? "bg-primary text-primary-foreground hover:opacity-90"
+                                : "border border-border bg-background hover:bg-muted"
                                 }`}
                         >
                             {p.ctaLabel}
