@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getProjectById } from "@/lib/projects/repository";
 import { listAssets } from "@/lib/assets/repository";
 import { notFound } from "next/navigation";
+import { BillingService } from "@/lib/billing/service";
 
 interface ProjectEditorPageProps {
     params: Promise<{ id: string }>;
@@ -24,9 +25,12 @@ export default async function ProjectEditorPage({ params }: ProjectEditorPagePro
     // Fetch initial assets for the project
     const { assets } = await listAssets(supabase, user.id, projectId, 50);
 
+    // Fetch entitlements
+    const entitlements = await BillingService.getEntitlements(user.id);
+
     return (
         <div className="h-screen bg-background">
-            <EditorProvider>
+            <EditorProvider entitlements={entitlements}>
                 <MainEditor
                     projectId={projectId}
                     project={project}

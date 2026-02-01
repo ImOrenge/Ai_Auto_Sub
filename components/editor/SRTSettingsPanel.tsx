@@ -18,6 +18,7 @@ import {
     RotateCcw,
     LayoutTemplate,
     Trash2,
+    Lock as LockIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -146,10 +147,17 @@ const EFFECT_OPTIONS = [
     ...getPresetsByPrefix(''), // All
 ];
 
+const TIER_ORDER = ["basic", "premium", "cinematic", "all"] as const;
 
-// ============================================================================
-// Main Component
-// ============================================================================
+const isTierAccessible = (userTier: string | undefined, itemTier: string | undefined) => {
+    if (!itemTier || itemTier === "basic") return true;
+    if (!userTier) return false;
+
+    const userIdx = TIER_ORDER.indexOf(userTier as any);
+    const itemIdx = TIER_ORDER.indexOf(itemTier as any);
+
+    return userIdx >= itemIdx || userTier === "all";
+};
 
 export function SRTSettingsPanel({ }: SRTSettingsPanelProps) {
     const {
@@ -717,6 +725,9 @@ function TemplatesTab({
 }: {
     onApplyPreset: (presetConfig: Partial<SubtitleConfig>) => void;
 }) {
+    const { entitlements } = useEditor();
+    const userTemplateTier = entitlements?.features.templateAccess || "basic";
+
     return (
         <div className="p-4">
             <div className="space-y-2 mb-4">
@@ -725,29 +736,52 @@ function TemplatesTab({
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-                {PRESET_TEMPLATES.map((preset) => (
-                    <button
-                        key={preset.id}
-                        onClick={() => onApplyPreset(preset.config)}
-                        className="relative group flex flex-col items-center gap-2 p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-primary/50 transition-all text-center overflow-hidden"
-                    >
-                        {/* Preview Circle */}
-                        <div
-                            className="size-12 rounded-full mb-1 shadow-lg flex items-center justify-center font-bold text-black border-2 border-white/20"
-                            style={{
-                                backgroundColor: preset.previewColor,
-                                fontFamily: preset.config.fontName?.includes(" ") ? `'${preset.config.fontName}'` : preset.config.fontName,
-                                fontSize: '14px',
-                            }}
+                {PRESET_TEMPLATES.map((preset) => {
+                    const isLocked = !isTierAccessible(userTemplateTier, preset.tier);
+                    return (
+                        <button
+                            key={preset.id}
+                            onClick={() => !isLocked && onApplyPreset(preset.config)}
+                            disabled={isLocked}
+                            className={cn(
+                                "relative group flex flex-col items-center gap-2 p-4 rounded-xl border border-white/10 bg-white/5 transition-all text-center overflow-hidden",
+                                isLocked ? "opacity-60 grayscale cursor-not-allowed" : "hover:bg-white/10 hover:border-primary/50"
+                            )}
                         >
-                            Aa
-                        </div>
-                        <div className="space-y-0.5 z-10 w-full">
-                            <p className="text-sm font-medium text-foreground truncate">{preset.name}</p>
-                            <p className="text-[10px] text-muted-foreground line-clamp-2 h-7">{preset.description}</p>
-                        </div>
-                    </button>
-                ))}
+                            {/* Preview Circle */}
+                            <div
+                                className="size-12 rounded-full mb-1 shadow-lg flex items-center justify-center font-bold text-black border-2 border-white/20"
+                                style={{
+                                    backgroundColor: preset.previewColor,
+                                    fontFamily: preset.config.fontName?.includes(" ") ? `'${preset.config.fontName}'` : preset.config.fontName,
+                                    fontSize: '14px',
+                                }}
+                            >
+                                Aa
+                            </div>
+                            <div className="space-y-0.5 z-10 w-full">
+                                <p className="text-sm font-medium text-foreground truncate">{preset.name}</p>
+                                <p className="text-[10px] text-muted-foreground line-clamp-2 h-7">{preset.description}</p>
+                            </div>
+
+                            {/* Lock Overlay */}
+                            {isLocked && (
+                                <div className="absolute top-2 right-2">
+                                    <LockIcon className="size-3 text-primary" />
+                                </div>
+                            )}
+
+                            {/* Tier Badge */}
+                            <div className={cn(
+                                "absolute bottom-0 left-0 right-0 py-0.5 text-[8px] font-black uppercase tracking-widest",
+                                preset.tier === 'cinematic' ? "bg-amber-500/20 text-amber-500" :
+                                    preset.tier === 'premium' ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
+                            )}>
+                                {preset.tier}
+                            </div>
+                        </button>
+                    );
+                })}
             </div>
             <p className="text-[10px] text-muted-foreground mt-4 text-center">
                 템플릿을 선택하면 현재 스타일 설정이 덮어씌워집니다.
@@ -886,6 +920,9 @@ function EffectsTab({
     style: SubtitleConfig;
     onStyleChange: <K extends keyof SubtitleConfig>(key: K, value: SubtitleConfig[K]) => void;
 }) {
+    const { entitlements } = useEditor();
+    const userTemplateTier = entitlements?.features.templateAccess || "basic";
+
     // Local state for hover preview
     const [hoveredEffect, setHoveredEffect] = useState<string | null>(null);
 
@@ -908,19 +945,25 @@ function EffectsTab({
                         <div className="grid grid-cols-4 gap-2">
                             {category.options.map((effect) => {
                                 const isSelected = style.effect === effect.value;
+                                const preset = getEffectPreset(effect.value);
+                                const isLocked = !isTierAccessible(userTemplateTier, preset?.tier);
+
                                 return (
                                     <button
                                         key={effect.value}
                                         type="button"
-                                        onClick={() => onStyleChange("effect", effect.value)}
+                                        onClick={() => !isLocked && onStyleChange("effect", effect.value)}
                                         onMouseEnter={() => setHoveredEffect(effect.value)}
                                         onMouseLeave={() => setHoveredEffect(null)}
+                                        disabled={isLocked}
                                         className={cn(
                                             "relative group flex flex-col items-center justify-center p-2 rounded-lg border transition-all text-center gap-2 h-full",
                                             isSelected
                                                 ? "border-primary bg-primary/5 shadow-[0_0_0_1px_rgba(var(--primary),1)]"
-                                                : "border-border hover:border-primary/50 hover:bg-secondary/50"
+                                                : "border-border hover:border-primary/50 hover:bg-secondary/50",
+                                            isLocked && "opacity-60 grayscale cursor-not-allowed border-dashed"
                                         )}
+                                        title={isLocked ? `${preset?.tier} 플랜 이상에서 사용 가능합니다` : effect.label}
                                     >
                                         <div className={cn(
                                             "flex items-center justify-center w-full h-10 rounded-md bg-muted/20 overflow-hidden transition-colors",
@@ -935,12 +978,18 @@ function EffectsTab({
                                         </div>
 
                                         <div className="space-y-0.5 w-full">
-                                            <p className={cn("text-[10px] font-semibold truncate px-1", isSelected ? "text-primary" : "text-foreground")}>
+                                            <p className={cn("text-[8px] font-semibold truncate px-1 uppercase", isSelected ? "text-primary" : "text-foreground")}>
                                                 {effect.label.split(' (')[0]}
                                             </p>
                                         </div>
 
-                                        {isSelected && (
+                                        {isLocked && (
+                                            <div className="absolute top-1 right-1">
+                                                <LockIcon className="size-2 text-primary" />
+                                            </div>
+                                        )}
+
+                                        {isSelected && !isLocked && (
                                             <div className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-primary shadow-sm" />
                                         )}
                                     </button>

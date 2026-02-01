@@ -69,6 +69,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
+    // 1. Plan-based Limit Check (Resolution)
+    if (format === "mp4" && resolution) {
+      const entitlements = await BillingService.getEntitlements(job.user_id || MOCK_USER_ID);
+      if (!BillingService.isResolutionAccessible(entitlements.exportResolutionLimit, resolution)) {
+        return NextResponse.json(
+          { error: `${entitlements.planName} 플랜에서는 ${resolution} 해상도 내보내기를 지원하지 않습니다. 720p(HD) 이상은 업그레이드가 필요합니다.` },
+          { status: 403 }
+        );
+      }
+    }
+
     // Use edited captions if available, otherwise source
     // Use edited captions if available, otherwise source
     const captionData: CaptionData | null = job.caption_edit ?? job.caption_source;

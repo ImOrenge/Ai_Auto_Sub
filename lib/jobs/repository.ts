@@ -27,6 +27,9 @@ type JobRow = {
   sequence?: unknown | null;
   created_at: string;
   updated_at: string;
+  priority?: "standard" | "priority" | "highest";
+  export_settings?: unknown | null;
+  cost?: number | null;
   assets?: { filename: string; storage_key: string | null; source_url: string | null } | null;
 };
 
@@ -53,6 +56,9 @@ function mapRowToRecord(row: JobRow): JobRecord {
     sequence: (row.sequence as JobRecord["sequence"]) ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    priority: row.priority,
+    exportSettings: row.export_settings ?? null,
+    cost: typeof row.cost === "number" ? row.cost : 0,
     asset: row.assets ? {
       filename: row.assets.filename,
       storageKey: row.assets?.storage_key ?? undefined,
@@ -77,6 +83,7 @@ export async function insertJobRecord(input: JobCreateInput): Promise<JobRecord>
     result_srt_url: null,
     result_video_url: null,
     subtitle_config: input.subtitleConfig ?? null,
+    priority: input.priority ?? "standard",
   };
 
   const { data, error } = await supabase.from(TABLE).insert(row).select().single();
@@ -184,6 +191,15 @@ function mapUpdateToRow(update: JobUpdateInput): Partial<JobRow> {
   }
   if ("sequence" in update) {
     payload.sequence = update.sequence ?? null;
+  }
+  if ("priority" in update) {
+    payload.priority = update.priority;
+  }
+  if ("exportSettings" in update) {
+    payload.export_settings = update.exportSettings ?? null;
+  }
+  if (typeof update.cost === "number") {
+    payload.cost = update.cost;
   }
 
   return payload;

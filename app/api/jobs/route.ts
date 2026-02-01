@@ -82,17 +82,17 @@ export async function POST(request: Request) {
     const entitlements = await BillingService.getEntitlements(effectiveUserId);
     
     // Concurrent Jobs Check
-    if (autoStart && entitlements.jobs.activeCount >= entitlements.jobs.concurrentLimit) {
+    if (autoStart && entitlements.jobs.activeCount >= entitlements.jobs.concurrentExportsLimit) {
       return NextResponse.json({ 
-        error: `Concurrent job limit reached (${entitlements.jobs.activeCount}/${entitlements.jobs.concurrentLimit}). Please wait or upgrade.` 
+        error: `Concurrent job limit reached (${entitlements.jobs.activeCount}/${entitlements.jobs.concurrentExportsLimit}). Please wait or upgrade.` 
       }, { status: 429 });
     }
 
     // Usage Limit Check
     const sub = await BillingService.getSubscription(effectiveUserId);
-    if (sub.planId === "free" && entitlements.stt.isOverLimit) {
+    if (sub.planId === "starter" && entitlements.credits.isOverLimit) {
        return NextResponse.json({
-         error: `Free plan usage limit reached (${entitlements.stt.used}/${entitlements.stt.total} mins). Please upgrade to continue.`
+         error: `Starter plan usage limit reached (${entitlements.credits.used}/${entitlements.credits.total} credits). Please upgrade to continue.`
        }, { status: 403 });
     }
 
@@ -103,6 +103,7 @@ export async function POST(request: Request) {
       projectId: resolvedProjectId ?? null,
       sourceType: resolvedSourceType,
       subtitleConfig: subtitleConfig ? { ...DEFAULT_SUBTITLE_CONFIG, ...subtitleConfig } : null,
+      priority: entitlements.features.queuePriority,
     });
 
     if (autoStart) {

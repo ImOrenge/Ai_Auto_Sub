@@ -11,6 +11,8 @@ import {
 import { MOCK_USER_ID } from "../utils";
 import { getSupabaseServer } from "../supabaseServer";
 import { env } from "../env";
+import { PRESET_TEMPLATES } from "../jobs/types";
+import { CAPTION_PRESETS } from "../subtitle-definitions";
 
 // Default fallback limits if DB fetch fails or for Free tier if no record exists
 const DEFAULT_FREE_LIMITS: PlanLimits = { 
@@ -18,7 +20,8 @@ const DEFAULT_FREE_LIMITS: PlanLimits = {
   concurrentExports: 1, 
   storageRetentionDays: 7, 
   queuePriority: "standard", 
-  templateAccess: "basic" 
+  templateAccess: "basic",
+  exportResolutionLimit: "hd" 
 };
 const DEFAULT_FREE_FEATURES: PlanFeatures = { priority: false, apiAccess: false, watermark: true };
 
@@ -130,6 +133,7 @@ export class BillingService {
       .not('status', 'in', '("done","error","canceled","awaiting_edit","editing","ready_to_export")');
 
     return {
+      planId: subscription.planId as PlanId,
       planName: planConfig.name,
       credits: {
         total: planConfig.limits.monthlyCredits,
@@ -144,6 +148,7 @@ export class BillingService {
       storage: {
         retentionDays: planConfig.limits.storageRetentionDays
       },
+      exportResolutionLimit: planConfig.limits.exportResolutionLimit,
       features: {
         queuePriority: planConfig.limits.queuePriority,
         templateAccess: planConfig.limits.templateAccess
@@ -216,15 +221,34 @@ export class BillingService {
             queue_id,
             queues (
                 project_id
-            )
+            ),
+            export_settings,
+            subtitle_config
         `)
         .eq('id', jobId)
         .single();
         
-    // data structure: { queue_id: "...", queues: { project_id: "..." } }
-    // Note: queues could be null if job has no queue (shouldn't happen in new flow)
-    // Cast to any to avoid type errors since I know the shape better than the inferred one if types aren't updated
     const projectId = (jobData as any)?.queues?.project_id || null;
+    const exportSettings = (jobData as any)?.export_settings || {};
+    const subtitleConfig = (jobData as any)?.subtitle_config || {};
+
+    // 1. Resolve Quality
+    let quality = 'FHD';
+    const res = (exportSettings.resolution || 'fhd').toLowerCase();
+    if (res === 'sd') quality = 'HD'; // Treat SD as HD for now or add SD rate? Price model doesn't have SD rate, assuming HD is base.
+    if (res === 'hd' || res === '720p') quality = 'HD';
+    if (res === 'fhd' || res === '1080p') quality = 'FHD';
+    if (res === 'uhd' || res === '4k') quality = 'UHD';
+
+    // 2. Resolve Tier
+    let tier = 'basic';
+    if (subtitleConfig.templateId) {
+        const template = PRESET_TEMPLATES.find(p => p.id === subtitleConfig.templateId);
+        if (template) tier = template.tier;
+    } else if (subtitleConfig.effect) {
+        const preset = CAPTION_PRESETS.find(p => p.id === subtitleConfig.effect);
+        if (preset) tier = preset.tier || 'basic';
+    }
 
     // 1. Get current entitlements to check remaining quota
     const entitlements = await this.getEntitlements(userId);
@@ -239,11 +263,7 @@ export class BillingService {
     // Rates from Price_model.md
     const PROCESSING_RATE = 0.20; // credits / min
     
-    // For Export, we need quality and template tier. 
-    // Mocking template and quality for now as they might come from job metadata or usage object.
-    // Assuming usage object is extended or we resolve from job.
-    const quality = (jobData as any)?.usage_metrics?.quality || 'FHD';
-    const tier = (jobData as any)?.usage_metrics?.tier || 'basic';
+    // Quality and tier now resolved from actual data above
 
     const QUALITY_RATES: Record<string, number> = {
         'HD': 0.04,
@@ -318,5 +338,25 @@ export class BillingService {
         console.error('[BillingService] Job Update Error:', jobError);
         throw jobError;
     }
+  }
+
+  static isResolutionAccessible(userLimit: "hd" | "fhd" | "uhd" | undefined, resolution: string): boolean {
+    const RESOLUTION_ORDER = ["sd", "hd", "fhd", "uhd"] as const;
+    
+    // Normalize resolution labels
+    let r = resolution.toLowerCase();
+    if (r === "720p") r = "hd";
+    if (r === "1080p") r = "fhd";
+    if (r === "4k") r = "uhd";
+
+    if (r === "sd") return true;
+    if (!userLimit) return r === "hd" || r === "sd";
+
+    const userIdx = RESOLUTION_ORDER.indexOf(userLimit as any);
+    const itemIdx = RESOLUTION_ORDER.indexOf(r as any);
+
+    if (itemIdx === -1) return true; // Unknown resolution, allow for now
+    
+    return userIdx >= itemIdx;
   }
 }

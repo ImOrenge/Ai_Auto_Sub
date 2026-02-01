@@ -14,6 +14,8 @@ import type {
 import type { AssetRecord } from "../../lib/assets/types";
 import { DEFAULT_SUBTITLE_CONFIG, DEFAULT_LANGUAGE_CONFIG } from "../../lib/jobs/types";
 import { validateAllCues } from "../../lib/subtitle/validation";
+import type { EntitlementSummary } from "../../lib/billing/types";
+import { MOCK_USER_ID } from "../../lib/utils";
 
 // ============================================================================
 // Editor Types
@@ -107,6 +109,8 @@ type EditorState = {
     clipboard: ClipClipboard | null;
     /** All cues from all caption layers combined */
     allCues: SubtitleCue[];
+    /** User entitlements (credits, job limits, features) */
+    entitlements: EntitlementSummary | null;
 };
 
 type EditorActions = {
@@ -212,9 +216,11 @@ const EditorContext = createContext<EditorContextValue | null>(null);
 type EditorProviderProps = {
     children: ReactNode;
     initialData?: CaptionData;
+    entitlements?: EntitlementSummary | null;
 };
 
-export function EditorProvider({ children, initialData }: EditorProviderProps) {
+export function EditorProvider({ children, initialData, entitlements: initialEntitlements }: EditorProviderProps) {
+    const [entitlements] = useState<EntitlementSummary | null>(initialEntitlements ?? null);
     const [cues, setCuesInternal] = useState<SubtitleCue[]>(initialData?.cues ?? []);
     const [selectedCueId, setSelectedCueId] = useState<number | null>(null);
     const [defaultStyle, setDefaultStyleInternal] = useState<SubtitleConfig>(
@@ -722,6 +728,7 @@ export function EditorProvider({ children, initialData }: EditorProviderProps) {
         activeLayerId,
         clipboard,
         allCues: layers.flatMap(l => l.cues.map(c => ({ ...c, layerId: l.id }))).sort((a, b) => a.startTime - b.startTime),
+        entitlements,
         // Actions
         setCues,
         selectCue,

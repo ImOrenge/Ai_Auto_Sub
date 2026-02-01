@@ -10,6 +10,7 @@ export interface PlanLimits {
   storageRetentionDays: number;
   queuePriority: "standard" | "priority" | "highest";
   templateAccess: "basic" | "premium" | "cinematic" | "all";
+  exportResolutionLimit: "hd" | "fhd" | "uhd";
 }
 
 export interface PlanFeatures {
@@ -42,6 +43,7 @@ export interface Subscription {
 
 // Entitlements = What user can do RIGHT NOW (Calculated from Sub + Usage)
 export interface EntitlementSummary {
+  planId: PlanId;
   planName: string;
   
   // Credit Usage
@@ -67,6 +69,7 @@ export interface EntitlementSummary {
     queuePriority: "standard" | "priority" | "highest";
     templateAccess: "basic" | "premium" | "cinematic" | "all";
   };
+  exportResolutionLimit: "hd" | "fhd" | "uhd";
 }
 
 // Usage Ledger (The "Source of Truth" for billing)

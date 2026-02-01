@@ -22,7 +22,8 @@ import {
     Scissors,
     ArrowLeft,
     Loader2,
-    Zap
+    Zap,
+    Lock as LockIcon
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -74,6 +75,18 @@ type ClientExportCodecPreference =
     | "source"
     | "hevc";
 
+const RESOLUTION_ORDER = ["sd", "hd", "fhd", "uhd"] as const;
+
+const isResolutionAccessible = (userLimit: "hd" | "fhd" | "uhd" | undefined, resolution: "sd" | "hd" | "fhd" | "uhd") => {
+    if (resolution === "sd") return true;
+    if (!userLimit) return resolution === "hd"; // Default fallback
+
+    const userIdx = RESOLUTION_ORDER.indexOf(userLimit as any);
+    const itemIdx = RESOLUTION_ORDER.indexOf(resolution as any);
+
+    return userIdx >= itemIdx;
+};
+
 export function MainEditor({ projectId, project, initialAssets }: MainEditorProps) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
@@ -99,6 +112,7 @@ export function MainEditor({ projectId, project, initialAssets }: MainEditorProp
         setCurrentTime,
         isPlaying,
         setIsPlaying,
+        entitlements,
         isPipelineRunning,
         setIsPipelineRunning,
         currentJobId,
@@ -1021,9 +1035,27 @@ export function MainEditor({ projectId, project, initialAssets }: MainEditorProp
                                 </SelectTrigger>
                                 <SelectContent className="rounded-2xl shadow-xl border-border">
                                     <SelectItem value="sd" className="py-3 px-4 rounded-xl">SD (480p) - 가장 빠른 속도</SelectItem>
-                                    <SelectItem value="hd" className="py-3 px-4 rounded-xl">HD (720p) - 빠른 속도</SelectItem>
-                                    <SelectItem value="fhd" className="py-3 px-4 rounded-xl">FHD (1080p) - 권장</SelectItem>
-                                    <SelectItem value="uhd" className="py-3 px-4 rounded-xl">UHD (4K) - 고화질</SelectItem>
+
+                                    <SelectItem value="hd" className="py-3 px-4 rounded-xl" disabled={!isResolutionAccessible(entitlements?.exportResolutionLimit, "hd")}>
+                                        <div className="flex items-center justify-between w-full gap-4">
+                                            <span>HD (720p) - 빠른 속도</span>
+                                            {!isResolutionAccessible(entitlements?.exportResolutionLimit, "hd") && <LockIcon className="size-3 text-primary" />}
+                                        </div>
+                                    </SelectItem>
+
+                                    <SelectItem value="fhd" className="py-3 px-4 rounded-xl" disabled={!isResolutionAccessible(entitlements?.exportResolutionLimit, "fhd")}>
+                                        <div className="flex items-center justify-between w-full gap-4">
+                                            <span>FHD (1080p) - 권장</span>
+                                            {!isResolutionAccessible(entitlements?.exportResolutionLimit, "fhd") && <LockIcon className="size-3 text-primary" />}
+                                        </div>
+                                    </SelectItem>
+
+                                    <SelectItem value="uhd" className="py-3 px-4 rounded-xl" disabled={!isResolutionAccessible(entitlements?.exportResolutionLimit, "uhd")}>
+                                        <div className="flex items-center justify-between w-full gap-4">
+                                            <span>UHD (4K) - 고화질</span>
+                                            {!isResolutionAccessible(entitlements?.exportResolutionLimit, "uhd") && <LockIcon className="size-3 text-primary" />}
+                                        </div>
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>

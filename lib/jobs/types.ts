@@ -477,6 +477,8 @@ export type JobRecord = {
     sttMinutes: number;
     translationLanguages: number;
   };
+  priority?: "standard" | "priority" | "highest";
+  exportSettings?: any;
 };
 
 export type JobCreateInput = {
@@ -486,6 +488,7 @@ export type JobCreateInput = {
   assetId?: string | null;
   sourceType?: SourceType;
   subtitleConfig?: SubtitleConfig | null;
+  priority?: "standard" | "priority" | "highest";
 };
 
 export type JobUpdateInput = {
@@ -503,6 +506,8 @@ export type JobUpdateInput = {
   cuts?: VideoCut[] | null;
   sequence?: SequenceClip[] | SequenceData | null;
   cost?: number;
+  priority?: "standard" | "priority" | "highest";
+  exportSettings?: any;
 };
 export type PresetTemplate = {
   id: string;
@@ -510,6 +515,7 @@ export type PresetTemplate = {
   description: string;
   previewColor: string;
   config: Partial<SubtitleConfig>;
+  tier: "basic" | "premium" | "cinematic";
 };
 
 export const PRESET_TEMPLATES: PresetTemplate[] = [
@@ -531,6 +537,7 @@ export const PRESET_TEMPLATES: PresetTemplate[] = [
       displayMode: "standard",
       position: "bottom",
     },
+    tier: "basic",
   },
   {
     id: "shorts",
@@ -554,6 +561,7 @@ export const PRESET_TEMPLATES: PresetTemplate[] = [
       position: "center",
       highlightColor: "#FFFF00",
     },
+    tier: "premium",
   },
   {
     id: "cinematic",
@@ -575,6 +583,7 @@ export const PRESET_TEMPLATES: PresetTemplate[] = [
       position: "bottom",
       marginV: 40,
     },
+    tier: "basic",
   },
   {
     id: "cute",
@@ -599,6 +608,7 @@ export const PRESET_TEMPLATES: PresetTemplate[] = [
       displayMode: "standard",
       position: "bottom",
     },
+    tier: "premium",
   },
   {
     id: "neon",
@@ -621,5 +631,6 @@ export const PRESET_TEMPLATES: PresetTemplate[] = [
       displayMode: "standard",
       position: "bottom",
     },
+    tier: "cinematic",
   },
 ];
