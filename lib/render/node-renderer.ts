@@ -52,21 +52,36 @@ if (!isMainThread) {
 
     // Register Fonts
     if (GlobalFonts) {
-      // Register Anton font
-      const antonFontPath = path.join(process.cwd(), 'lib/render/fonts/Anton-Regular.ttf');
-      try {
-        GlobalFonts.registerFromPath(antonFontPath, 'Anton');
-      } catch (err) {
-          console.warn('[Worker] Failed to register Anton font:', err);
-      }
+      // Font list: [filename, family name]
+      const fontsToRegister = [
+        // English fonts
+        ['Anton-Regular.ttf', 'Anton'],
+        
+        // Korean fonts - Gothic (고딕체)
+        ['NotoSansKR-Variable.ttf', 'Noto Sans KR'],
+        ['NanumGothic-Regular.ttf', 'Nanum Gothic'],
+        ['IBMPlexSansKR-Regular.ttf', 'IBM Plex Sans KR'],
+        ['DoHyeon-Regular.ttf', 'Do Hyeon'],
+        ['Jua-Regular.ttf', 'Jua'],
+        ['BlackHanSans-Regular.ttf', 'Black Han Sans'],
+        
+        // Korean fonts - Serif (명조체)
+        ['NotoSerifKR-Variable.ttf', 'Noto Serif KR'],
+        ['NanumMyeongjo-Regular.ttf', 'Nanum Myeongjo'],
+        ['GowunBatang-Regular.ttf', 'Gowun Batang'],
+        
+        // Korean fonts - Decorative (장식체/손글씨)
+        ['GamjaFlower-Regular.ttf', 'Gamja Flower'],
+        ['Sunflower-Medium.ttf', 'Sunflower'],
+      ];
 
-      // Register Korean fonts (Noto Sans KR) for proper Korean character rendering
-      // Using variable font which supports all weights (Regular, Bold, etc.)
-      const koreanFontPath = path.join(process.cwd(), 'lib/render/fonts/NotoSansKR-Variable.ttf');
-      try {
-        GlobalFonts.registerFromPath(koreanFontPath, 'Noto Sans KR');
-      } catch (err) {
-        console.warn('[Worker] Failed to register Noto Sans KR:', err);
+      for (const [filename, familyName] of fontsToRegister) {
+        const fontPath = path.join(process.cwd(), 'lib/render/fonts', filename);
+        try {
+          GlobalFonts.registerFromPath(fontPath, familyName);
+        } catch (err) {
+          console.warn(`[Worker] Failed to register ${familyName}:`, err);
+        }
       }
     }
 
@@ -352,13 +367,33 @@ export async function renderSubtitleVideo(
           const ctx = canvas.getContext('2d');
           
           if (canvasModule.GlobalFonts) {
-              // Register Anton font
-              const antonFontPath = path.join(process.cwd(), 'lib/render/fonts/Anton-Regular.ttf');
-              try { canvasModule.GlobalFonts.registerFromPath(antonFontPath, 'Anton'); } catch (e) {}
-              
-              // Register Korean fonts (Noto Sans KR) - Variable font
-              const koreanFontPath = path.join(process.cwd(), 'lib/render/fonts/NotoSansKR-Variable.ttf');
-              try { canvasModule.GlobalFonts.registerFromPath(koreanFontPath, 'Noto Sans KR'); } catch (e) {}
+              // Font list: [filename, family name]
+              const fontsToRegister = [
+                // English fonts
+                ['Anton-Regular.ttf', 'Anton'],
+                
+                // Korean fonts - Gothic (고딕체)
+                ['NotoSansKR-Variable.ttf', 'Noto Sans KR'],
+                ['NanumGothic-Regular.ttf', 'Nanum Gothic'],
+                ['IBMPlexSansKR-Regular.ttf', 'IBM Plex Sans KR'],
+                ['DoHyeon-Regular.ttf', 'Do Hyeon'],
+                ['Jua-Regular.ttf', 'Jua'],
+                ['BlackHanSans-Regular.ttf', 'Black Han Sans'],
+                
+                // Korean fonts - Serif (명조체)
+                ['NotoSerifKR-Variable.ttf', 'Noto Serif KR'],
+                ['NanumMyeongjo-Regular.ttf', 'Nanum Myeongjo'],
+                ['GowunBatang-Regular.ttf', 'Gowun Batang'],
+                
+                // Korean fonts - Decorative (장식체/손글씨)
+                ['GamjaFlower-Regular.ttf', 'Gamja Flower'],
+                ['Sunflower-Medium.ttf', 'Sunflower'],
+              ];
+
+              for (const [filename, familyName] of fontsToRegister) {
+                const fontPath = path.join(process.cwd(), 'lib/render/fonts', filename);
+                try { canvasModule.GlobalFonts.registerFromPath(fontPath, familyName); } catch (e) {}
+              }
           }
 
           const presetId = style.effect;

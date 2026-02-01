@@ -11,11 +11,25 @@ import type { SubtitleConfig } from "@/lib/jobs/types";
 // ============================================================================
 
 const FONT_OPTIONS = [
-    { value: "Arial", label: "Arial" },
-    { value: "NanumGothic", label: "나눔고딕" },
-    { value: "NanumBarunGothic", label: "나눔바른고딕" },
-    { value: "Malgun Gothic", label: "맑은 고딕" },
+    // 고딕체 (Gothic/Sans-serif)
     { value: "Noto Sans KR", label: "Noto Sans 한국어" },
+    { value: "Nanum Gothic", label: "나눔고딕" },
+    { value: "IBM Plex Sans KR", label: "IBM Plex 한국어" },
+    { value: "Do Hyeon", label: "도현체" },
+    { value: "Jua", label: "주아체" },
+    { value: "Black Han Sans", label: "검은고딕체" },
+
+    // 명조체 (Serif)
+    { value: "Noto Serif KR", label: "Noto 명조체" },
+    { value: "Nanum Myeongjo", label: "나눔명조" },
+    { value: "Gowun Batang", label: "고운바탕" },
+
+    // 손글씨/장식체 (Decorative/Handwriting)
+    { value: "Gamja Flower", label: "감자꽃체 (귀여움)" },
+    { value: "Sunflower", label: "해바라기체" },
+
+    // 영문
+    { value: "Arial", label: "Arial (영문)" },
 ];
 
 const POSITION_OPTIONS = [
