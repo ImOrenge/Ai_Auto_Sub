@@ -34,7 +34,7 @@ RUN npm run build
 FROM node:20-slim AS runner
 WORKDIR /app
 
-# Install runtime dependencies (ffmpeg and canvas libraries)
+# Install runtime dependencies (ffmpeg, canvas libraries, and Korean fonts)
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     libcairo2 \
@@ -43,6 +43,7 @@ RUN apt-get update && apt-get install -y \
     libgif7 \
     librsvg2-2 \
     libpixman-1-0 \
+    fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
 
 # Set production environment
@@ -61,8 +62,8 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Optional: Copy fonts if they are needed for custom rendering
-# COPY --from=builder --chown=nextjs:nodejs /app/lib/render/fonts ./lib/render/fonts
+# Copy fonts for custom rendering (needed for subtitle effects)
+COPY --from=builder --chown=nextjs:nodejs /app/lib/render/fonts ./lib/render/fonts
 
 EXPOSE 8080
 
