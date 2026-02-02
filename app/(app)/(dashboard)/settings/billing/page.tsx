@@ -51,7 +51,7 @@ export default async function BillingPage() {
         BillingService.getInvoices(userId),
     ]);
 
-    const usagePercentage = Math.min(100, (entitlements.credits.used / entitlements.credits.total) * 100);
+    const usagePercentage = Math.min(100, ((entitlements?.credits?.used || 0) / (entitlements?.credits?.total || 1)) * 100);
 
     return (
         <div className="space-y-8">
@@ -93,19 +93,19 @@ export default async function BillingPage() {
                         <div className="flex items-center justify-between text-sm">
                             <span className="text-muted-foreground">Usage (STT)</span>
                             <span className="font-medium">
-                                {entitlements.credits.used} / {entitlements.credits.total} mins
+                                {entitlements?.credits?.used || 0} / {entitlements?.credits?.total || 0} mins
                             </span>
                         </div>
                         <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary">
                             <div
                                 className={cn(
                                     "h-full rounded-full transition-all",
-                                    entitlements.credits.isOverLimit ? "bg-red-500" : "bg-primary"
+                                    entitlements?.credits?.isOverLimit ? "bg-red-500" : "bg-primary"
                                 )}
                                 style={{ width: `${usagePercentage}%` }}
                             />
                         </div>
-                        {entitlements.credits.isOverLimit && (
+                        {entitlements?.credits?.isOverLimit && (
                             <p className="mt-2 text-xs text-red-500 font-medium">
                                 Limit exceeded. Overage will be charged next cycle.
                             </p>
@@ -147,7 +147,7 @@ export default async function BillingPage() {
                             </div>
                             <div>
                                 <p className="text-xs text-muted-foreground">Remaining</p>
-                                <p className="text-xl font-semibold">{entitlements.credits.remaining}m</p>
+                                <p className="text-xl font-semibold">{entitlements?.credits?.remaining || 0}m</p>
                             </div>
                         </div>
                     </article>

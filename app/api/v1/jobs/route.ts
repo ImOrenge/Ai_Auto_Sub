@@ -45,14 +45,14 @@ export async function POST(request: Request) {
     // 1. Check Quotas
     const entitlements = await BillingService.getEntitlements(userId);
     
-    if (autoStart && entitlements.jobs.activeCount >= entitlements.jobs.concurrentLimit) {
+    if (autoStart && entitlements.jobs.activeCount >= entitlements.jobs.concurrentExportsLimit) {
       return NextResponse.json({ 
-        error: `Concurrent job limit reached (${entitlements.jobs.activeCount}/${entitlements.jobs.concurrentLimit}).` 
+        error: `Concurrent job limit reached (${entitlements.jobs.activeCount}/${entitlements.jobs.concurrentExportsLimit}).` 
       }, { status: 429 });
     }
 
     const sub = await BillingService.getSubscription(userId);
-    if (sub.planId === "free" && entitlements.stt.isOverLimit) {
+    if (sub.planId === "starter" && entitlements.credits.isOverLimit) {
        return NextResponse.json({
          error: "Free plan usage limit reached."
        }, { status: 403 });

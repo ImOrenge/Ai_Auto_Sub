@@ -132,26 +132,28 @@ export class BillingService {
       .eq('user_id', userId)
       .not('status', 'in', '("done","error","canceled","awaiting_edit","editing","ready_to_export")');
 
+    const fallbackCredits = {
+      total: planConfig.limits.monthlyCredits || 0,
+      used: totalUsed || 0,
+      remaining: Math.max(0, (planConfig.limits.monthlyCredits || 0) - (totalUsed || 0)),
+      isOverLimit: (totalUsed || 0) >= (planConfig.limits.monthlyCredits || 0)
+    };
+
     return {
       planId: subscription.planId as PlanId,
       planName: planConfig.name,
-      credits: {
-        total: planConfig.limits.monthlyCredits,
-        used: totalUsed,
-        remaining: Math.max(0, planConfig.limits.monthlyCredits - totalUsed),
-        isOverLimit: totalUsed >= planConfig.limits.monthlyCredits
-      },
+      credits: fallbackCredits,
       jobs: {
-        concurrentExportsLimit: planConfig.limits.concurrentExports,
+        concurrentExportsLimit: planConfig.limits.concurrentExports || 1,
         activeCount: activeCount || 0
       },
       storage: {
-        retentionDays: planConfig.limits.storageRetentionDays
+        retentionDays: planConfig.limits.storageRetentionDays || 7
       },
-      exportResolutionLimit: planConfig.limits.exportResolutionLimit,
+      exportResolutionLimit: planConfig.limits.exportResolutionLimit || "hd",
       features: {
-        queuePriority: planConfig.limits.queuePriority,
-        templateAccess: planConfig.limits.templateAccess
+        queuePriority: planConfig.limits.queuePriority || "standard",
+        templateAccess: planConfig.limits.templateAccess || "basic"
       }
     };
   }

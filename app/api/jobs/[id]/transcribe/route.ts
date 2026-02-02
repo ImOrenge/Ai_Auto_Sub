@@ -21,9 +21,9 @@ export async function POST(
 
     // Check Quotas (Concurrent Jobs)
     const entitlements = await BillingService.getEntitlements(job.userId || MOCK_USER_ID);
-    if (entitlements.jobs.activeCount >= entitlements.jobs.concurrentLimit) {
+    if (entitlements.jobs.activeCount >= entitlements.jobs.concurrentExportsLimit) {
       return NextResponse.json({ 
-        error: `Concurrent job limit reached (${entitlements.jobs.activeCount}/${entitlements.jobs.concurrentLimit}). Please wait or upgrade.` 
+        error: `Concurrent job limit reached (${entitlements.jobs.activeCount}/${entitlements.jobs.concurrentExportsLimit}). Please wait or upgrade.` 
       }, { status: 429 });
     }
 
