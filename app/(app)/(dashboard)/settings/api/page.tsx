@@ -21,6 +21,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useToast } from "@/components/ui/use-toast";
+import { useLanguage } from "@/lib/i18n";
 
 type ApiKey = {
     id: string;
@@ -51,6 +52,7 @@ const EVENT_TYPES = [
 ];
 
 export default function APISettingsPage() {
+    const { t, language } = useLanguage();
     const [activeTab, setActiveTab] = useState<"keys" | "webhooks">("keys");
     const [keys, setKeys] = useState<ApiKey[]>([]);
     const [webhooks, setWebhooks] = useState<WebhookRecord[]>([]);
@@ -103,7 +105,7 @@ export default function APISettingsPage() {
                 setCreatedKey(data.key);
                 setNewKeyName("");
                 setIsCreatingKey(false);
-                toast({ title: "API Key Created", description: "Your new key is ready." });
+                toast({ title: t("dashboard.api.keys.newKey"), description: t("dashboard.api.keys.success") });
             } else {
                 toast({
                     variant: "destructive",
@@ -120,7 +122,7 @@ export default function APISettingsPage() {
     };
 
     const handleDeleteKey = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this API key?") || isPending) return;
+        if (!confirm(t("dashboard.api.keys.deleteConfirm")) || isPending) return;
         setIsPending(true);
         try {
             const res = await fetch(`/api/internal/api-keys/${id}`, { method: "DELETE" });
@@ -153,7 +155,7 @@ export default function APISettingsPage() {
                 setNewWebhookUrl("");
                 setSelectedEvents(["job.completed", "job.failed"]);
                 setIsCreatingWebhook(false);
-                toast({ title: "Webhook Added", description: "The endpoint has been registered." });
+                toast({ title: t("dashboard.api.webhooks.add"), description: t("dashboard.api.webhooks.noWebhooksDesc") });
             } else {
                 toast({
                     variant: "destructive",
@@ -171,7 +173,7 @@ export default function APISettingsPage() {
 
     const handleDeleteWebhook = async (id: string) => {
         // ... handled in previous chunk ...
-        if (!confirm("Are you sure you want to delete this webhook?") || isPending) return;
+        if (!confirm(t("dashboard.api.webhooks.deleteConfirm")) || isPending) return;
         setIsPending(true);
         try {
             const res = await fetch(`/api/internal/webhooks/${id}`, { method: "DELETE" });
@@ -222,9 +224,9 @@ export default function APISettingsPage() {
     return (
         <div className="space-y-6">
             <div className="flex flex-col gap-1">
-                <h2 className="text-xl font-bold tracking-tight">API & Developer Settings</h2>
+                <h2 className="text-xl font-bold tracking-tight">{t("dashboard.api.title")}</h2>
                 <p className="text-sm text-muted-foreground">
-                    Integrate our services into your own applications and workflows.
+                    {t("dashboard.api.subtitle")}
                 </p>
             </div>
 
@@ -240,7 +242,7 @@ export default function APISettingsPage() {
                     )}
                 >
                     <Key className="size-4" />
-                    API Keys
+                    {t("dashboard.api.tabs.keys")}
                 </button>
                 <button
                     onClick={() => setActiveTab("webhooks")}
@@ -252,7 +254,7 @@ export default function APISettingsPage() {
                     )}
                 >
                     <Webhook className="size-4" />
-                    Webhooks
+                    {t("dashboard.api.tabs.webhooks")}
                 </button>
             </div>
 
@@ -268,15 +270,15 @@ export default function APISettingsPage() {
                         {/* API Keys Content */}
                         <div className="flex items-center justify-between">
                             <div>
-                                <h3 className="font-semibold">Your API Keys</h3>
-                                <p className="text-sm text-muted-foreground">Authenticate your requests to the public API.</p>
+                                <h3 className="font-bold">{t("dashboard.api.keys.title")}</h3>
+                                <p className="text-sm text-muted-foreground">{t("dashboard.api.keys.subtitle")}</p>
                             </div>
                             <button
                                 onClick={() => setIsCreatingKey(true)}
-                                className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-semibold hover:opacity-90 transition"
+                                className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-bold hover:opacity-90 transition active:scale-95 shadow-sm"
                             >
                                 <Plus className="size-4" />
-                                New API Key
+                                {t("dashboard.api.keys.newKey")}
                             </button>
                         </div>
 
@@ -284,27 +286,27 @@ export default function APISettingsPage() {
                         {isCreatingKey && (
                             <div className="p-4 rounded-2xl border border-primary/20 bg-primary/5 space-y-4">
                                 <div className="space-y-2">
-                                    <label className="text-sm font-semibold">Key Name</label>
+                                    <label className="text-sm font-bold">{t("dashboard.api.keys.nameLabel")}</label>
                                     <div className="flex gap-2">
                                         <input
                                             value={newKeyName}
                                             onChange={(e) => setNewKeyName(e.target.value)}
-                                            placeholder="Production, Automation Tool, etc."
-                                            className="flex-1 rounded-xl border border-border bg-background px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                                            placeholder={t("dashboard.api.keys.namePlaceholder")}
+                                            className="flex-1 rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition"
                                         />
                                         <button
                                             onClick={handleCreateKey}
                                             disabled={!newKeyName || isPending}
-                                            className="bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-semibold disabled:opacity-50 flex items-center gap-2"
+                                            className="bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-50 flex items-center gap-2 shadow-sm transition"
                                         >
                                             {isPending && <RefreshCcw className="size-3 animate-spin" />}
-                                            Create
+                                            {t("dashboard.api.keys.create")}
                                         </button>
                                         <button
                                             onClick={() => setIsCreatingKey(false)}
-                                            className="px-4 py-2 text-sm font-semibold"
+                                            className="px-4 py-2 text-sm font-bold text-muted-foreground hover:text-foreground transition"
                                         >
-                                            Cancel
+                                            {t("dashboard.api.keys.cancel")}
                                         </button>
                                     </div>
                                 </div>
@@ -316,10 +318,10 @@ export default function APISettingsPage() {
                             <div className="p-6 rounded-2xl border-2 border-emerald-500/30 bg-emerald-500/5 space-y-4">
                                 <div className="flex items-center gap-2 text-emerald-600 font-bold">
                                     <ShieldCheck className="size-5" />
-                                    Key Created Successfully
+                                    {t("dashboard.api.keys.success")}
                                 </div>
-                                <p className="text-sm">
-                                    Make sure to copy your API key now. For your security, <strong className="text-emerald-600">you won't be able to see it again</strong>.
+                                <p className="text-sm font-medium">
+                                    {t("dashboard.api.keys.successDesc")}
                                 </p>
                                 <div className="flex items-center gap-2 p-3 bg-background border rounded-xl overflow-hidden">
                                     <code className="text-sm font-mono flex-1 truncate">{createdKey.rawKey}</code>
@@ -332,9 +334,9 @@ export default function APISettingsPage() {
                                 </div>
                                 <button
                                     onClick={() => setCreatedKey(null)}
-                                    className="text-sm font-semibold underline underline-offset-4"
+                                    className="text-sm font-bold underline underline-offset-4 text-emerald-600 hover:text-emerald-700 transition"
                                 >
-                                    I've saved my key
+                                    {t("dashboard.api.keys.saved")}
                                 </button>
                             </div>
                         )}
@@ -346,8 +348,10 @@ export default function APISettingsPage() {
                                     <div className="bg-secondary p-3 rounded-full w-fit mx-auto">
                                         <Key className="size-6 text-muted-foreground" />
                                     </div>
-                                    <p className="text-sm font-medium">No API keys yet</p>
-                                    <p className="text-xs text-muted-foreground max-w-[200px] mx-auto">Create a new key to start using our automation tools.</p>
+                                    <p className="text-sm font-bold">{t("dashboard.api.keys.noKeys")}</p>
+                                    <p className="text-xs text-muted-foreground max-w-[200px] mx-auto font-medium">
+                                        {t("dashboard.api.keys.noKeysDesc")}
+                                    </p>
                                 </div>
                             ) : (
                                 keys.map((key) => (
@@ -363,7 +367,9 @@ export default function APISettingsPage() {
                                                     <span>•</span>
                                                     <span className="flex items-center gap-1">
                                                         <Clock className="size-3" />
-                                                        {key.last_used_at ? `Last used ${format(new Date(key.last_used_at), "MMM d, HH:mm")}` : "Never used"}
+                                                        {key.last_used_at
+                                                            ? t("dashboard.api.keys.lastUsed").replace("{date}", format(new Date(key.last_used_at), "MMM d, HH:mm"))
+                                                            : t("dashboard.api.keys.neverUsed")}
                                                     </span>
                                                 </div>
                                             </div>
@@ -379,11 +385,10 @@ export default function APISettingsPage() {
                             )}
                         </div>
 
-                        <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 flex gap-3 text-sm text-amber-700">
+                        <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/10 flex gap-3 text-sm text-amber-700/80 font-medium">
                             <AlertCircle className="size-5 shrink-0" />
                             <p>
-                                Treat your API keys like passwords. Never share them or check them into version control.
-                                Use different keys for different environments or tools to maintain granular control.
+                                {t("dashboard.api.keys.securityNote")}
                             </p>
                         </div>
                     </motion.div>
@@ -398,15 +403,15 @@ export default function APISettingsPage() {
                         {/* Webhooks Content */}
                         <div className="flex items-center justify-between">
                             <div>
-                                <h3 className="font-semibold">Webhook Subscriptions</h3>
-                                <p className="text-sm text-muted-foreground">Receive real-time notifications for job status updates.</p>
+                                <h3 className="font-bold">{t("dashboard.api.webhooks.title")}</h3>
+                                <p className="text-sm text-muted-foreground">{t("dashboard.api.webhooks.subtitle")}</p>
                             </div>
                             <button
                                 onClick={() => setIsCreatingWebhook(true)}
-                                className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-semibold hover:opacity-90 transition"
+                                className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-bold hover:opacity-90 transition active:scale-95 shadow-sm"
                             >
                                 <Plus className="size-4" />
-                                Add Endpoint
+                                {t("dashboard.api.webhooks.add")}
                             </button>
                         </div>
 
@@ -414,17 +419,17 @@ export default function APISettingsPage() {
                         {isCreatingWebhook && (
                             <div className="p-4 rounded-2xl border border-primary/20 bg-primary/5 space-y-4">
                                 <div className="space-y-3">
-                                    <label className="text-sm font-semibold">Endpoint URL</label>
+                                    <label className="text-sm font-bold">{t("dashboard.api.webhooks.urlLabel")}</label>
                                     <input
                                         value={newWebhookUrl}
                                         onChange={(e) => setNewWebhookUrl(e.target.value)}
-                                        placeholder="https://your-app.com/webhooks"
-                                        className="w-full rounded-xl border border-border bg-background px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                                        placeholder={t("dashboard.api.webhooks.urlPlaceholder")}
+                                        className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition"
                                     />
                                 </div>
 
                                 <div className="space-y-3">
-                                    <label className="text-sm font-semibold">Select Events</label>
+                                    <label className="text-sm font-bold">{t("dashboard.api.webhooks.eventsLabel")}</label>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                         {EVENT_TYPES.map((type) => (
                                             <label key={type.id} className="flex items-start gap-3 p-3 rounded-xl border bg-background hover:bg-secondary/20 transition cursor-pointer">
@@ -453,16 +458,16 @@ export default function APISettingsPage() {
                                     <button
                                         onClick={handleCreateWebhook}
                                         disabled={!newWebhookUrl || selectedEvents.length === 0 || isPending}
-                                        className="bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-semibold disabled:opacity-50 flex items-center gap-2"
+                                        className="bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-50 flex items-center gap-2 shadow-sm transition"
                                     >
                                         {isPending && <RefreshCcw className="size-3 animate-spin" />}
-                                        Add Endpoint
+                                        {t("dashboard.api.webhooks.add")}
                                     </button>
                                     <button
                                         onClick={() => setIsCreatingWebhook(false)}
-                                        className="px-4 py-2 text-sm font-semibold"
+                                        className="px-4 py-2 text-sm font-bold text-muted-foreground hover:text-foreground transition"
                                     >
-                                        Cancel
+                                        {t("dashboard.api.keys.cancel")}
                                     </button>
                                 </div>
                             </div>
@@ -476,8 +481,8 @@ export default function APISettingsPage() {
                                         <div className="bg-secondary p-3 rounded-full w-fit mx-auto">
                                             <Webhook className="size-6 text-muted-foreground" />
                                         </div>
-                                        <p className="text-sm font-medium">No webhooks yet</p>
-                                        <p className="text-xs text-muted-foreground">Connect your system to receive job events automatically.</p>
+                                        <p className="text-sm font-bold">{t("dashboard.api.webhooks.noWebhooks")}</p>
+                                        <p className="text-xs text-muted-foreground font-medium">{t("dashboard.api.webhooks.noWebhooksDesc")}</p>
                                     </div>
                                 </div>
                             ) : (
@@ -499,7 +504,7 @@ export default function APISettingsPage() {
                                                     className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition"
                                                 >
                                                     <Play className="size-3" />
-                                                    Test
+                                                    {t("dashboard.api.webhooks.test")}
                                                 </button>
                                                 <button
                                                     onClick={() => handleDeleteWebhook(webhook.id)}
@@ -520,7 +525,7 @@ export default function APISettingsPage() {
 
                                         <div className="pt-4 border-t flex items-center justify-between">
                                             <div className="space-y-1">
-                                                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Signing Secret</span>
+                                                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">{t("dashboard.api.webhooks.secret")}</span>
                                                 <div className="flex items-center gap-2">
                                                     <code className="text-[10px] font-mono bg-muted px-2 py-1 rounded">••••••••••••••••</code>
                                                     <button
@@ -532,7 +537,7 @@ export default function APISettingsPage() {
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest block">Created</span>
+                                                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest block">{t("dashboard.api.webhooks.created")}</span>
                                                 <span className="text-[10px]">{format(new Date(webhook.created_at), "MMM d, yyyy")}</span>
                                             </div>
                                         </div>
@@ -544,10 +549,9 @@ export default function APISettingsPage() {
                         <div className="p-4 rounded-xl bg-blue-500/5 border border-blue-500/20 flex gap-3 text-sm text-blue-700">
                             <RefreshCcw className="size-5 shrink-0" />
                             <div className="space-y-1">
-                                <p className="font-semibold">Delivery Logs</p>
-                                <p className="text-xs">
-                                    Logs for your webhook deliveries will be available here soon. We retry failed
-                                    deliveries up to 3 times automatically.
+                                <p className="font-bold text-blue-800">{t("dashboard.api.webhooks.logsTitle")}</p>
+                                <p className="text-xs font-medium text-blue-700/80">
+                                    {t("dashboard.api.webhooks.logsDesc")}
                                 </p>
                             </div>
                         </div>

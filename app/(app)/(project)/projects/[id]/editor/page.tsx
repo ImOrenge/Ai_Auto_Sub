@@ -29,7 +29,7 @@ export default async function ProjectEditorPage({ params }: ProjectEditorPagePro
     const entitlements = await BillingService.getEntitlements(user.id);
 
     return (
-        <div className="h-screen bg-background">
+        <div className="h-[calc(100dvh-65px)] bg-background flex flex-col w-full overflow-hidden">
             <EditorProvider entitlements={entitlements}>
                 <MainEditor
                     projectId={projectId}

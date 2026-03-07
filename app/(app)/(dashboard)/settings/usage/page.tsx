@@ -6,6 +6,7 @@ import { UsageSummaryCards } from "@/components/usage/UsageSummaryCards";
 import { UsageLimitBar } from "@/components/usage/UsageLimitBar";
 import { UsageTable } from "@/components/usage/UsageTable";
 import { UsageLedgerItem } from "@/lib/billing/types";
+import { useLanguage } from "@/lib/i18n";
 
 // ============================================================================
 // Types
@@ -38,6 +39,7 @@ export default function UsagePage() {
 }
 
 function UsagePageContent() {
+    const { t, language } = useLanguage();
     const [data, setData] = useState<UsageData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -70,14 +72,19 @@ function UsagePageContent() {
         fetchUsage();
     }, []);
 
-    if (isLoading) return <UsagePageLoading />;
+    if (isLoading) return (
+        <div className="flex items-center justify-center py-12">
+            <Loader2 className="size-8 animate-spin text-primary/50" />
+            <span className="ml-3 text-sm text-muted-foreground">{t("dashboard.usage.loading")}</span>
+        </div>
+    );
 
     if (error) return (
         <div className="text-center py-10">
             <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-6 inline-block text-left">
-                <p className="text-destructive font-semibold">Error: {error}</p>
+                <p className="text-destructive font-semibold">{t("dashboard.usage.error")}: {error}</p>
                 <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-background border rounded hover:bg-secondary">
-                    Retry
+                    {t("dashboard.usage.retry")}
                 </button>
             </div>
         </div>
@@ -88,9 +95,11 @@ function UsagePageContent() {
     return (
         <div className="space-y-8">
             <div className="flex flex-col gap-2">
-                <h2 className="text-lg font-semibold">Usage Overview</h2>
+                <h2 className="text-xl font-bold tracking-tight">{t("dashboard.usage.title")}</h2>
                 <p className="text-sm text-muted-foreground">
-                    Current period: {new Date(data.period.start).toLocaleDateString()} - {new Date(data.period.end).toLocaleDateString()}
+                    {t("dashboard.usage.currentPeriod")
+                        .replace("{start}", new Date(data.period.start).toLocaleDateString(language === "ko" ? "ko-KR" : "en-US"))
+                        .replace("{end}", new Date(data.period.end).toLocaleDateString(language === "ko" ? "ko-KR" : "en-US"))}
                 </p>
             </div>
 

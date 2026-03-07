@@ -1,28 +1,34 @@
 "use client";
 
 import { FEATURES } from "@/lib/landing-data";
+import { useLanguage } from "@/lib/i18n";
 
 export default function FeatureGrid() {
+    const { t } = useLanguage();
+
+    const featureKeys = ["editor", "aiEditor", "export", "style", "dashboard", "api"];
+
     return (
         <section id="features" className="mx-auto max-w-6xl px-4 py-16 md:py-24 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-150">
             <div className="text-center mb-12">
                 <span className="inline-block px-3 py-1 text-xs font-medium bg-primary/10 text-primary rounded-full mb-4">
-                    Features
+                    {t("common.features")}
                 </span>
                 <h2 className="text-3xl font-bold md:text-4xl">
-                    자막 작업의 모든 것을 한 곳에서
+                    {t("landing.features.title")}
                 </h2>
                 <p className="mt-4 max-w-2xl mx-auto text-muted-foreground">
-                    업로드부터 편집, 내보내기까지. 복잡한 자막 워크플로우를 단순하게 만들어드립니다.
+                    {t("landing.features.subtitle")}
                 </p>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {FEATURES.map((f, idx) => {
                     const Icon = f.icon;
+                    const key = featureKeys[idx];
                     return (
                         <div
-                            key={f.title}
+                            key={key}
                             className="group relative p-6 rounded-2xl border border-border bg-card hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300"
                             style={{ animationDelay: `${idx * 100}ms` }}
                         >
@@ -32,13 +38,13 @@ export default function FeatureGrid() {
                             </div>
 
                             <div className="flex items-center gap-2 mb-2">
-                                <h3 className="text-lg font-semibold">{f.title}</h3>
+                                <h3 className="text-lg font-semibold">{t(`landing.features.items.${key}.title`)}</h3>
                                 {f.badge && (
                                     <span className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${f.badge === "Core"
-                                            ? "bg-primary text-primary-foreground"
-                                            : f.badge === "Popular"
-                                                ? "bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20"
-                                                : "bg-muted text-muted-foreground"
+                                        ? "bg-primary text-primary-foreground"
+                                        : f.badge === "Popular"
+                                            ? "bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20"
+                                            : "bg-muted text-muted-foreground"
                                         }`}>
                                         {f.badge}
                                     </span>
@@ -46,7 +52,7 @@ export default function FeatureGrid() {
                             </div>
 
                             <p className="text-sm text-muted-foreground leading-relaxed">
-                                {f.description}
+                                {t(`landing.features.items.${key}.description`)}
                             </p>
 
                             {/* Hover glow effect */}

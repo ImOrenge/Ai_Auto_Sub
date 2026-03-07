@@ -17,6 +17,7 @@ type JobRow = {
   step: string | null;
   progress: number | null;
   result_srt_url: string | null;
+  result_original_srt_url: string | null;
   result_video_url: string | null;
   error_message: string | null;
   subtitle_config: SubtitleConfig | null;
@@ -46,6 +47,7 @@ function mapRowToRecord(row: JobRow): JobRecord {
     step: row.step as JobStep | string | null,
     progress: typeof row.progress === "number" ? row.progress : 0,
     resultSrtUrl: row.result_srt_url,
+    resultOriginalSrtUrl: row.result_original_srt_url,
     resultVideoUrl: row.result_video_url,
     errorMessage: row.error_message,
     subtitleConfig: row.subtitle_config,
@@ -167,6 +169,9 @@ function mapUpdateToRow(update: JobUpdateInput): Partial<JobRow> {
   }
   if ("resultSrtUrl" in update) {
     payload.result_srt_url = update.resultSrtUrl ?? null;
+  }
+  if ("resultOriginalSrtUrl" in update) {
+    payload.result_original_srt_url = update.resultOriginalSrtUrl ?? null;
   }
   if ("resultVideoUrl" in update) {
     payload.result_video_url = update.resultVideoUrl ?? null;

@@ -1,10 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useEditor, EditorLayer } from "./EditorContext";
 import { VideoPlayer } from "./VideoPlayer";
 import { CaptionList } from "./CaptionList";
-import { ClientExportOverlay } from "./ClientExportOverlay";
 import { SRTSettingsPanel } from "./SRTSettingsPanel";
 import { CutTimeline } from "./CutTimeline";
 import { SourcePanel } from "./SourcePanel";
@@ -67,14 +66,6 @@ interface MainEditorProps {
     initialAssets: AssetRecord[];
 }
 
-type ClientExportCodecPreference =
-    | "auto"
-    | "h264-baseline"
-    | "h264-main"
-    | "h264-high"
-    | "source"
-    | "hevc";
-
 const RESOLUTION_ORDER = ["sd", "hd", "fhd", "uhd"] as const;
 
 const isResolutionAccessible = (userLimit: "hd" | "fhd" | "uhd" | undefined, resolution: "sd" | "hd" | "fhd" | "uhd") => {
@@ -98,7 +89,6 @@ export function MainEditor({ projectId, project, initialAssets }: MainEditorProp
     const [assets, setAssets] = useState<AssetRecord[]>(initialAssets);
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     const [exportResolution, setExportResolution] = useState<"sd" | "hd" | "fhd" | "uhd">("fhd");
-    const [clientExportCodec, setClientExportCodec] = useState<ClientExportCodecPreference>("auto");
     const router = useRouter();
 
     const {
@@ -123,8 +113,6 @@ export function MainEditor({ projectId, project, initialAssets }: MainEditorProp
         setIsSaving,
         isDirty,
         markSaved,
-        defaultStyle: subtitleStyle,
-        setDefaultStyle: setSubtitleStyle,
         language: languageConfig,
         setLanguage: setLanguageConfig,
         playbackSpeed,
@@ -143,14 +131,12 @@ export function MainEditor({ projectId, project, initialAssets }: MainEditorProp
         activeLayerId,
         addLayer,
         videoAspectRatio,
-        videoFit,
         duplicateLayer,
         deleteLayer,
         switchLayer,
         updateLayerName,
         loadLayers,
         loadCaptionData,
-        allCues,
     } = useEditor();
 
     // Latest state refs for polling closure
@@ -315,7 +301,7 @@ export function MainEditor({ projectId, project, initialAssets }: MainEditorProp
                     pollIntervalRef.current = null;
                     setIsPipelineRunning(false);
                     setPipelineStatus("");
-                    alert("캡션 생성 실패: " + job.errorMessage);
+                    alert("罹≪뀡 ?앹꽦 ?ㅽ뙣: " + job.errorMessage);
                 } else {
                     // Update UI with status and progress
                     setPipelineStatus(job.status.toUpperCase());
@@ -413,39 +399,39 @@ export function MainEditor({ projectId, project, initialAssets }: MainEditorProp
 
     const handleRunPipeline = async () => {
         if (clips.length === 0) {
-            alert("클립을 추가해주세요.");
+            alert("Please add a clip first.");
             return;
         }
 
         setIsPipelineRunning(true);
-        setPipelineStatus("저장 중...");
+        setPipelineStatus("???以?..");
         setPipelineProgress(0);
 
         try {
             // 1. First Save the current state (to ensure job exists and sequence is up to date)
-            await handleSave();
+            const jobId = await handleSave();
 
             // We need the job ID to trigger the pipeline
-            if (!currentJobId) {
+            if (!jobId) {
                 throw new Error("작업 정보를 찾을 수 없습니다. 다시 시도해주세요.");
             }
 
             setPipelineStatus("AI 캡션 생성 시작...");
-            const res = await fetch(`/api/jobs/${currentJobId}/transcribe`, {
+            const res = await fetch(`/api/jobs/${jobId}/transcribe`, {
                 method: "POST"
             });
 
             if (!res.ok) {
                 const errorData = await res.json().catch(() => ({}));
-                throw new Error(errorData.error || "캡션 생성을 시작할 수 없습니다.");
+                throw new Error(errorData.error || "罹≪뀡 ?앹꽦???쒖옉?????놁뒿?덈떎.");
             }
 
             // 2. Polling for job status
-            startPolling(currentJobId);
+            startPolling(jobId);
 
         } catch (err) {
             console.error("Pipeline failed", err);
-            alert(err instanceof Error ? err.message : "작업 처리에 실패했습니다.");
+            alert(err instanceof Error ? err.message : "?묒뾽 泥섎━???ㅽ뙣?덉뒿?덈떎.");
             setIsPipelineRunning(false);
             setPipelineStatus("");
         }
@@ -499,7 +485,7 @@ export function MainEditor({ projectId, project, initialAssets }: MainEditorProp
         onDelete: handleDeleteActiveClip,
     });
 
-    const handleSave = async () => {
+    const handleSave = async (): Promise<string> => {
         let jobId = currentJobId;
         setIsSaving(true);
 
@@ -507,15 +493,17 @@ export function MainEditor({ projectId, project, initialAssets }: MainEditorProp
             // 1. Ensure job exists if we don't have one yet
             if (!jobId) {
                 const firstAsset = clips[0]?.asset;
+                const createJobPayload = {
+                    projectId,
+                    sourceType: 'sequence' as const,
+                    autoStart: false,
+                    assetId: firstAsset?.id ?? null,
+                    ...(firstAsset?.sourceUrl ? { url: firstAsset.sourceUrl } : {}),
+                };
                 const res = await fetch(`/api/jobs`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        projectId,
-                        url: firstAsset?.sourceUrl || "sequence",
-                        sourceType: 'sequence',
-                        autoStart: false
-                    })
+                    body: JSON.stringify(createJobPayload)
                 });
                 if (res.ok) {
                     const { job } = await res.json();
@@ -523,7 +511,7 @@ export function MainEditor({ projectId, project, initialAssets }: MainEditorProp
                     setCurrentJobId(jobId);
                 } else {
                     const errorData = await res.json().catch(() => ({}));
-                    const message = errorData.error || "작업 저장 공간을 생성하지 못했습니다.";
+                    const message = errorData.error || "?묒뾽 ???怨듦컙???앹꽦?섏? 紐삵뻽?듬땲??";
                     throw new Error(message);
                 }
             }
@@ -563,139 +551,25 @@ export function MainEditor({ projectId, project, initialAssets }: MainEditorProp
             });
             if (res.ok) {
                 markSaved();
+                return jobId;
             } else {
                 const errorText = await res.text();
-                let errorMessage = "저장에 실패했습니다.";
+                let errorMessage = "??μ뿉 ?ㅽ뙣?덉뒿?덈떎.";
                 try {
                     const errorJson = JSON.parse(errorText);
                     if (errorJson.error) errorMessage += ` (${errorJson.error})`;
                 } catch {
                     errorMessage += ` (${res.status})`;
                 }
-                alert(errorMessage);
+                throw new Error(errorMessage);
             }
         } catch (err) {
             console.error("Failed to save", err);
-            alert(err instanceof Error ? err.message : "저장에 실패했습니다.");
+            const message = err instanceof Error ? err.message : "저장에 실패했습니다.";
+            alert(message);
+            throw err instanceof Error ? err : new Error(message);
         } finally {
             setIsSaving(false);
-        }
-    };
-
-    const [clientExportProgress, setClientExportProgress] = useState<number | null>(null);
-    const [clientExportStatus, setClientExportStatus] = useState<string>("");
-    const [clientExportPreview, setClientExportPreview] = useState<string | null>(null);
-
-    const handleClientExport = async () => {
-        if (!clips.length) return;
-        setIsExporting(true);
-        setIsExportModalOpen(false);
-        setClientExportProgress(0);
-        setClientExportStatus("Initializing...");
-        setClientExportPreview(null);
-
-        try {
-            // 1. Get Blob
-            const activeClip = clips[0]; // TODO: Support sequencing
-            const url = activeClip.asset.storageKey
-                ? `/api/assets/${activeClip.asset.id}/view` // Use view endpoint
-                : activeClip.asset.sourceUrl;
-
-            if (!url) throw new Error("No source URL");
-
-            setClientExportStatus("Downloading Video...");
-            const response = await fetch(url);
-            const blob = await response.blob();
-            const file = new File([blob], activeClip.asset.filename || "video.mp4", { type: blob.type });
-
-            // 2. Load Renderer
-            setClientExportStatus("Loading Engine...");
-            const { ClientRenderer } = await import("@/lib/renderer/ClientRenderer");
-            const mp4boxModule = await import('mp4box');
-            // @ts-ignore
-            const mp4box = mp4boxModule.default || mp4boxModule;
-
-            if (!mp4box || !mp4box.createFile) {
-                throw new Error("Failed to load MP4Box library (createFile missing)");
-            }
-
-            // 3. Configure
-            let targetWidth: number | undefined;
-            let targetHeight: number | undefined;
-
-            if (videoAspectRatio !== 'original') {
-                const baseSize = {
-                    'sd': { w: 854, h: 480 },
-                    'hd': { w: 1280, h: 720 },
-                    'fhd': { w: 1920, h: 1080 },
-                    'uhd': { w: 3840, h: 2160 }
-                }[exportResolution] || { w: 1920, h: 1080 };
-
-                if (videoAspectRatio === '16:9') {
-                    targetWidth = baseSize.w;
-                    targetHeight = baseSize.h;
-                } else if (videoAspectRatio === '9:16') {
-                    targetWidth = baseSize.h;
-                    targetHeight = baseSize.w;
-                } else if (videoAspectRatio === '1:1') {
-                    targetWidth = baseSize.h;
-                    targetHeight = baseSize.h;
-                }
-            }
-
-            // If original, we rely on ClientRenderer to use source dims, OR we could try to scale if we knew source dims.
-            // For now, let's respect the "Quality" setting even for original if possible, but we lack source aspect ratio here reliably without looking at specific clip.
-            // So we leave it undefined for 'original' which defaults to source size (ClientRenderer default).
-
-            const renderer = new ClientRenderer(file, {
-                onProgress: (p) => setClientExportProgress(p),
-                onStatus: (s) => setClientExportStatus(s),
-                onFrame: (f) => setClientExportPreview(f),
-                cues: allCues, // Use all cues from all caption layers
-                style: subtitleStyle, // Use current styles
-                bitrate: 8_000_000,
-                codecPreference: clientExportCodec,
-                width: targetWidth,
-                height: targetHeight,
-                fit: videoFit
-            }, mp4box);
-
-            // 4. Run
-            await renderer.start();
-
-            // 5. Finalize & Upload
-            setClientExportStatus("서버에 업로드 중...");
-            const resultBlob = await renderer.getBlob();
-            const formData = new FormData();
-            formData.append("file", resultBlob, `export_${currentJobId}.mp4`);
-
-            const uploadRes = await fetch(`/api/jobs/${currentJobId}/upload-result`, {
-                method: "POST",
-                body: formData
-            });
-
-            if (!uploadRes.ok) {
-                throw new Error("Failed to upload result to server");
-            }
-
-            setClientExportStatus("완료! 결과 페이지로 이동합니다...");
-
-            // Short delay to let the user see "Done"
-            setTimeout(() => {
-                if (currentJobId && projectId) {
-                    router.push(routes.exportResult(projectId, currentJobId));
-                }
-                setClientExportProgress(null);
-                setClientExportPreview(null);
-            }, 1000);
-
-        } catch (e) {
-            console.error(e);
-            alert("Export Failed: " + (e instanceof Error ? e.message : "Unknown Error"));
-            setClientExportProgress(null);
-            setClientExportPreview(null);
-        } finally {
-            setIsExporting(false);
         }
     };
 
@@ -705,18 +579,14 @@ export function MainEditor({ projectId, project, initialAssets }: MainEditorProp
         setIsExporting(true);
 
         try {
-            // First save the current editor state
-            await handleSave();
-
-            // Then trigger the server-side render
-            console.log("[MainEditor] Starting export for job:", currentJobId, "with renderer: canvas");
-            const res = await fetch(`/api/jobs/${currentJobId}/export`, {
+            const jobId = await handleSave();
+            const res = await fetch(`/api/jobs/${jobId}/export`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     format: "mp4",
                     resolution: exportResolution,
-                    renderer: "canvas" // Explicitly use the new renderer
+                    renderer: "canvas"
                 })
             });
 
@@ -725,11 +595,12 @@ export function MainEditor({ projectId, project, initialAssets }: MainEditorProp
                 throw new Error(error.error || "Failed to start export");
             }
 
-            // Redirect to the result page which polls for completion
-            router.push(routes.exportResult(projectId, currentJobId));
+            alert("Server render started in background.");
+            router.push(routes.exportResult(projectId, jobId));
         } catch (e) {
             console.error(e);
             alert("Export Failed: " + (e instanceof Error ? e.message : "Unknown Error"));
+        } finally {
             setIsExporting(false);
         }
     };
@@ -767,7 +638,7 @@ export function MainEditor({ projectId, project, initialAssets }: MainEditorProp
         if (recovery && recovery.data) {
             const timeDiff = Date.now() - recovery.timestamp;
             const minutesAgo = Math.floor(timeDiff / 60000);
-            const timeText = minutesAgo < 1 ? '방금 전' : `${minutesAgo}분 전`;
+            const timeText = minutesAgo < 1 ? "방금 전" : `${minutesAgo}분 전`;
 
             const shouldRestore = window.confirm(
                 `저장되지 않은 작업이 있습니다 (${timeText}). 복원하시겠습니까?`
@@ -797,7 +668,7 @@ export function MainEditor({ projectId, project, initialAssets }: MainEditorProp
 
 
     return (
-        <div className="flex flex-col h-screen overflow-hidden bg-background w-screen max-w-full">
+        <div className="flex flex-col h-full overflow-hidden bg-background w-full">
             {/* Top Bar - Consolidated Single Line */}
             <header className="h-12 border-b bg-card flex items-center justify-between px-3 z-30 shadow-sm shrink-0">
                 <div className="flex items-center gap-2">
@@ -1017,42 +888,42 @@ export function MainEditor({ projectId, project, initialAssets }: MainEditorProp
             <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>
                 <DialogContent className="sm:max-w-md rounded-3xl">
                     <DialogHeader>
-                        <DialogTitle className="text-2xl font-bold">내보내기 설정</DialogTitle>
+                        <DialogTitle className="text-2xl font-bold">Export Video</DialogTitle>
                         <DialogDescription>
-                            영상 결과물의 해상도를 선택하고 내보내기를 시작합니다.
+                            Your export will run on the server in the background.
                         </DialogDescription>
                     </DialogHeader>
 
                     <div className="py-6 space-y-6">
                         <div className="space-y-3">
-                            <label className="text-sm font-semibold text-muted-foreground ml-1">해상도 선택</label>
+                            <label className="text-sm font-semibold text-muted-foreground ml-1">Resolution</label>
                             <Select
                                 value={exportResolution}
                                 onValueChange={(v: any) => setExportResolution(v)}
                             >
                                 <SelectTrigger className="w-full h-14 rounded-2xl text-lg border-2 focus:ring-primary/20">
-                                    <SelectValue placeholder="해상도 선택" />
+                                    <SelectValue placeholder="Select resolution" />
                                 </SelectTrigger>
                                 <SelectContent className="rounded-2xl shadow-xl border-border">
-                                    <SelectItem value="sd" className="py-3 px-4 rounded-xl">SD (480p) - 가장 빠른 속도</SelectItem>
+                                    <SelectItem value="sd" className="py-3 px-4 rounded-xl">SD (480p) - fastest</SelectItem>
 
                                     <SelectItem value="hd" className="py-3 px-4 rounded-xl" disabled={!isResolutionAccessible(entitlements?.exportResolutionLimit, "hd")}>
                                         <div className="flex items-center justify-between w-full gap-4">
-                                            <span>HD (720p) - 빠른 속도</span>
+                                            <span>HD (720p) - fast</span>
                                             {!isResolutionAccessible(entitlements?.exportResolutionLimit, "hd") && <LockIcon className="size-3 text-primary" />}
                                         </div>
                                     </SelectItem>
 
                                     <SelectItem value="fhd" className="py-3 px-4 rounded-xl" disabled={!isResolutionAccessible(entitlements?.exportResolutionLimit, "fhd")}>
                                         <div className="flex items-center justify-between w-full gap-4">
-                                            <span>FHD (1080p) - 권장</span>
+                                            <span>FHD (1080p) - recommended</span>
                                             {!isResolutionAccessible(entitlements?.exportResolutionLimit, "fhd") && <LockIcon className="size-3 text-primary" />}
                                         </div>
                                     </SelectItem>
 
                                     <SelectItem value="uhd" className="py-3 px-4 rounded-xl" disabled={!isResolutionAccessible(entitlements?.exportResolutionLimit, "uhd")}>
                                         <div className="flex items-center justify-between w-full gap-4">
-                                            <span>UHD (4K) - 고화질</span>
+                                            <span>UHD (4K) - highest quality</span>
                                             {!isResolutionAccessible(entitlements?.exportResolutionLimit, "uhd") && <LockIcon className="size-3 text-primary" />}
                                         </div>
                                     </SelectItem>
@@ -1060,45 +931,14 @@ export function MainEditor({ projectId, project, initialAssets }: MainEditorProp
                             </Select>
                         </div>
 
-                        <div className="space-y-3">
-                            <label className="text-sm font-semibold text-muted-foreground ml-1">Codec</label>
-                            <Select
-                                value={clientExportCodec}
-                                onValueChange={(v: any) => setClientExportCodec(v as ClientExportCodecPreference)}
-                            >
-                                <SelectTrigger className="w-full h-14 rounded-2xl text-lg border-2 focus:ring-primary/20">
-                                    <SelectValue placeholder="Codec" />
-                                </SelectTrigger>
-                                <SelectContent className="rounded-2xl shadow-xl border-border">
-                                    <SelectItem value="auto" className="py-3 px-4 rounded-xl">Auto (compatibility-first)</SelectItem>
-                                    <SelectItem value="h264-baseline" className="py-3 px-4 rounded-xl">H.264 Baseline (compatibility)</SelectItem>
-                                    <SelectItem value="h264-main" className="py-3 px-4 rounded-xl">H.264 Main (quality)</SelectItem>
-                                    <SelectItem value="h264-high" className="py-3 px-4 rounded-xl">H.264 High (highest quality)</SelectItem>
-                                    <SelectItem value="source" className="py-3 px-4 rounded-xl">Match source codec</SelectItem>
-                                    <SelectItem value="hevc" className="py-3 px-4 rounded-xl">HEVC / H.265 (if supported)</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
                         <div className="bg-secondary/30 p-4 rounded-2xl border border-dashed text-xs text-muted-foreground leading-relaxed">
-                            💡 높은 해상도일수록 렌더링 시간이 더 오래 걸릴 수 있습니다.
-                            작업이 완료되면 결과 페이지에서 다운로드 가능합니다.
+                            You can track render progress on the result page after starting export.
                         </div>
                     </div>
 
                     <DialogFooter className="flex-col sm:flex-row gap-3">
-                        <Button
-                            variant="secondary"
-                            className="rounded-2xl h-12 px-6 gap-2 font-bold w-full sm:w-auto"
-                            onClick={handleClientExport}
-                            disabled={isExporting}
-                        >
-                            {isExporting ? <Loader2 className="size-4 animate-spin" /> : <Zap className="size-4 fill-current text-amber-500" />}
-                            빠른 내보내기 (Beta)
-                        </Button>
-                        <div className="flex-1" />
                         <Button variant="ghost" className="rounded-2xl h-12 px-6 w-full sm:w-auto" onClick={() => setIsExportModalOpen(false)}>
-                            취소
+                            Cancel
                         </Button>
                         <Button
                             className="rounded-2xl h-12 px-8 gap-2 font-bold shadow-lg shadow-primary/20 w-full sm:w-auto"
@@ -1106,25 +946,15 @@ export function MainEditor({ projectId, project, initialAssets }: MainEditorProp
                             disabled={isExporting}
                         >
                             {isExporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
-                            서버 내보내기
+                            Start Server Render
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
 
-            {/* Client Export Overlay */}
-            {clientExportProgress !== null && (
-                <ClientExportOverlay
-                    progress={clientExportProgress}
-                    status={clientExportStatus || "Processing..."}
-                    previewImageUrl={clientExportPreview}
-                    onCancel={() => {
-                        // TODO: Implement cancel token
-                        setClientExportProgress(null);
-                        setIsExporting(false);
-                    }}
-                />
-            )}
         </div>
     );
 }
+
+
+

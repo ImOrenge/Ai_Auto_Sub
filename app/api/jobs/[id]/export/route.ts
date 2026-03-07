@@ -23,7 +23,7 @@ type RouteParams = { params: Promise<{ id: string }> };
 type ExportRequest = {
   format: "srt" | "ass" | "mp4";
   resolution?: "sd" | "hd" | "fhd" | "uhd" | "720p" | "1080p" | "4k";
-  renderer?: "remotion" | "ffmpeg" | "canvas";
+  renderer?: "remotion" | "ffmpeg" | "canvas" | "local-agent";
 };
 
 /**
@@ -35,7 +35,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   try {
     const body = await request.json().catch(() => null);
-    let { format, resolution, renderer } = (body as ExportRequest) || {};
+    const parsed = (body as ExportRequest) || {};
+    let format = parsed.format;
+    const { resolution, renderer } = parsed;
     
     // Default to mp4 if format is missing
     if (!format) {
@@ -101,7 +103,36 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Handle MP4 export (video with burned-in subtitles)
     if (format === "mp4") {
       const sourceUrl = resolveCachedSourceUrl(job.url, job.result_video_url);
-      
+
+      // Local-agent mode: queue only, no server-side rendering.
+      if (renderer === "local-agent") {
+        await supabase
+          .from("jobs")
+          .update({
+            status: "exporting",
+            progress: 0,
+            error_message: null,
+            export_settings: {
+              resolution,
+              aspectRatio: captionData.videoAspectRatio,
+              exportedAt: new Date().toISOString(),
+              renderer: "local-agent",
+            },
+          })
+          .eq("id", id);
+
+        return NextResponse.json(
+          {
+            success: true,
+            message: "On-device export queued in background",
+            jobId: id,
+            format: "mp4",
+            renderer: "local-agent",
+          },
+          { status: 202 }
+        );
+      }
+
       // Save export settings to job for historical tracking
       await supabase
         .from("jobs")
@@ -206,7 +237,7 @@ async function handleMp4Export(
   supabase: ReturnType<typeof getSupabaseServer>,
   userId: string,
   cuts?: VideoCut[] | null,
-  sequence?: any | null,
+  sequence?: unknown | null,
   resolution?: string,
   renderer?: "remotion" | "ffmpeg" | "canvas",
   aspectRatio?: 'original' | '9:16' | '1:1' | '16:9'
@@ -238,9 +269,13 @@ async function handleMp4Export(
       content: assContent,
     };
 
+    // Determine if watermark is needed (Starter & Pro plans only)
+    const entitlements = await BillingService.getEntitlements(userId || MOCK_USER_ID);
+    const watermarkText = (entitlements.planId === 'starter' || entitlements.planId === 'pro') ? "AutoSubAI" : undefined;
+
     // Apply subtitles to video
     console.info(`[export/mp4] Rendering video with subtitles for job ${jobId} at ${resolution || 'original'} resolution, aspect ${aspectRatio || 'original'} (using ${renderer || 'canvas'})`);
-    const captionedVideo = await applySubtitlesToVideo(audio, subtitles, style, cuts, resolution, captionData.cues, jobId, renderer as 'canvas' | undefined, aspectRatio);
+    const captionedVideo = await applySubtitlesToVideo(audio, subtitles, style, cuts, resolution, captionData.cues, jobId, renderer as 'canvas' | undefined, aspectRatio, watermarkText);
 
     if (!captionedVideo.publicUrl) {
       throw new Error("Failed to render video with subtitles");

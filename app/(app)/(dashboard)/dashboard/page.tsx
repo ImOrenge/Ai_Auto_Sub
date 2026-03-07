@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { RecentProjectsSection } from "@/components/dashboard/RecentProjectsSection";
+import { useLanguage } from "@/lib/i18n";
 import { ActionNeededSection } from "@/components/dashboard/ActionNeededSection";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
 import { QuickActionsSection } from "@/components/dashboard/QuickActionsSection";
@@ -12,6 +13,7 @@ import { Project } from "@/lib/projects/types";
 import { mapProject } from "@/lib/projects/mapper";
 
 export default function DashboardPage() {
+    const { t } = useLanguage();
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -54,8 +56,8 @@ export default function DashboardPage() {
         <div className="p-6 md:p-8 space-y-10 max-w-7xl mx-auto">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Welcome Back</h1>
-                    <p className="text-muted-foreground mt-1 text-sm uppercase font-semibold tracking-wider">Main Console Overview</p>
+                    <h1 className="text-3xl font-bold tracking-tight">{t("dashboard.welcome")}</h1>
+                    <p className="text-muted-foreground mt-1 text-sm uppercase font-semibold tracking-wider">{t("dashboard.overview")}</p>
                 </div>
             </div>
 

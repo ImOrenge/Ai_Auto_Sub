@@ -15,6 +15,8 @@ const clamp = (value: number, min = 0, max = 1) => Math.min(max, Math.max(min, v
 
 const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
 
+const isTimeWithinRange = (time: number, start: number, end: number) => time >= start && time < end;
+
 const parseColor = (color: string) => {
     const ctx = typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
     if (ctx) {
@@ -243,21 +245,33 @@ const drawMultiLineText = (
     letterSpacing: number,
     mode: 'fill' | 'stroke',
     shadows?: ShadowSpec[],
-    skipMainText = false
+    skipMainText = false,
+    maxChars?: number
 ) => {
     const lines = text.split('\n');
     const totalHeight = lines.length * lineHeight;
     let currentY = y - totalHeight / 2 + lineHeight / 2;
     
-    lines.forEach(line => {
-        if (shadows && shadows.length > 0) {
-            drawMultiShadowText(ctx, line, x, currentY, letterSpacing, mode, shadows, skipMainText);
-        } else {
-            drawTextWithSpacing(ctx, line, x, currentY, letterSpacing, mode);
+    let charsProcessed = 0;
+    lines.forEach((line, index) => {
+        let lineToShow = line;
+        if (maxChars !== undefined) {
+            const remaining = Math.max(0, maxChars - charsProcessed);
+            lineToShow = line.slice(0, remaining);
         }
+
+        if (lineToShow.length > 0) {
+            if (shadows && shadows.length > 0) {
+                drawMultiShadowText(ctx, lineToShow, x, currentY, letterSpacing, mode, shadows, skipMainText);
+            } else {
+                drawTextWithSpacing(ctx, lineToShow, x, currentY, letterSpacing, mode);
+            }
+        }
+        charsProcessed += line.length + 1; // +1 for the newline we split on
         currentY += lineHeight;
     });
 };
+
 
 
 const drawTextWithSpacing = (
@@ -290,6 +304,29 @@ const drawTextWithSpacing = (
 
 
 const toRadians = (deg: number) => (deg * Math.PI) / 180;
+
+const wrapText = (ctx: CanvasRenderingContext2D | any, text: string, maxWidth: number, letterSpacing = 0) => {
+    const words = text.split(' ');
+    if (words.length <= 1) return [text];
+    
+    const lines = [];
+    let currentLine = words[0];
+
+    for (let i = 1; i < words.length; i++) {
+        const word = words[i];
+        const testLine = currentLine + ' ' + word;
+        const width = measureTextWithSpacing(ctx, testLine, letterSpacing);
+        if (width < maxWidth) {
+            currentLine = testLine;
+        } else {
+            lines.push(currentLine);
+            currentLine = word;
+        }
+    }
+    lines.push(currentLine);
+    return lines;
+};
+
 
 const to3dScale = (angle: number) => Math.max(0.2, Math.cos(toRadians(angle)));
 
@@ -465,9 +502,8 @@ export const renderSubtitleFrame = (
     
     const mappedFontName = fontMapping[fontName] || fontName;
     
-    // Prioritize Noto Sans KR for better Korean character support
-    // This ensures Korean text renders properly in Railway/server environments
-    const fontFallback = ", 'Noto Sans KR', Arial, sans-serif";
+    // Prioritize Noto Sans KR/JP for better character support in server environments
+    const fontFallback = ", 'Noto Sans KR', 'Noto Sans JP', Arial, sans-serif";
     ctx.font = `${fontWeight} ${fontSize}px "${mappedFontName}"${fontFallback}`; 
     
     ctx.textAlign = 'center';
@@ -477,25 +513,24 @@ export const renderSubtitleFrame = (
     const duration = cue.endTime - cue.startTime;
     const elapsed = currentTime - cue.startTime;
     const progress = clamp(duration > 0 ? elapsed / duration : 0);
-    
-    // Update canvasScale to use our responsive metric instead of just height
-    const canvasScale = responsiveScale; 
 
-    let globalAlpha = 1;
-    let globalYOffset = 0;
-    let globalXOffset = 0;
-    let globalScale = 1;
-    let globalScaleX = 1;
-    let globalScaleY = 1;
-    let globalRotate = 0;
-    let globalSkewX = 0;
-    let globalSkewY = 0;
-    let globalLetterSpacing = 0;
-    let globalFilter: string | undefined;
-    let globalTextShadow: ShadowSpec | undefined;
+    // 4. Bilingual Logic (Extracted early)
+    const isBilingual = style.showBilingual && (cue.originalText || cue.text.includes('\n'));
+    let originalText = "";
+    let translatedText = cue.text;
 
-    // Word segmentation
-    const words = cue.text.split(/\s+/).filter(Boolean);
+    if (isBilingual) {
+        if (cue.text.includes('\n')) {
+            const parts = cue.text.split('\n');
+            originalText = parts[0];
+            translatedText = parts.slice(1).join('\n');
+        } else if (cue.originalText && cue.originalText.trim() !== cue.text.trim()) {
+            originalText = cue.originalText;
+        }
+    }
+
+    // Word segmentation (Base these on translatedText for bilingual consistency)
+    const words = translatedText.split(/\s+/).filter(Boolean);
     const hasWordTimings = !!cue.words && cue.words.length === words.length;
     const wordTimings = words.map((word, index) => {
         if (hasWordTimings && cue.words?.[index]) {
@@ -505,7 +540,7 @@ export const renderSubtitleFrame = (
         const start = cue.startTime + index * step;
         return { word, start, end: start + step };
     });
-    const activeIdxFromTimings = wordTimings.findIndex((w) => currentTime >= w.start && currentTime <= w.end);
+    const activeIdxFromTimings = wordTimings.findIndex((w) => isTimeWithinRange(currentTime, w.start, w.end));
     const activeIdx = words.length > 0
         ? (activeIdxFromTimings !== -1
             ? activeIdxFromTimings
@@ -518,6 +553,21 @@ export const renderSubtitleFrame = (
         if (denom <= 0) return 0;
         return clamp((currentTime - timing.start) / denom);
     };
+
+    // Global State Variables
+    const canvasScale = responsiveScale;
+    let globalAlpha = 1;
+    let globalYOffset = 0;
+    let globalXOffset = 0;
+    let globalScale = 1;
+    let globalScaleX = 1;
+    let globalScaleY = 1;
+    let globalRotate = 0;
+    let globalSkewX = 0;
+    let globalSkewY = 0;
+    let globalLetterSpacing = 0;
+    let globalFilter: string | undefined;
+    let globalTextShadow: ShadowSpec | undefined;
 
     // Default Entry/Exit (None/Fade)
     const ENTRY_DUR = 0.3;
@@ -601,203 +651,77 @@ export const renderSubtitleFrame = (
     }
 
     // Measure Text & Wrap Logic
-    // Measure Text & Wrap Logic
     // Use 85% to leave room for padding and shadows/glows
     const maxWidth = width * 0.85; 
-    
-    // Define helper first
-    const wrapText = (context: any, text: string, maxWidth: number) => {
-        const words = text.split(' ');
-        const lines = [];
-        let currentLine = words[0];
 
-        for (let i = 1; i < words.length; i++) {
-            const word = words[i];
-            const width = measureTextWithSpacing(context, currentLine + " " + word, globalLetterSpacing);
-            if (width < maxWidth) {
-                currentLine += " " + word;
-            } else {
-                lines.push(currentLine);
-                currentLine = word;
-            }
+    const wrapLines = (text: string, maxWidth: number) => {
+        if (style.displayMode === 'single-word') {
+            return [words[Math.max(0, activeIdx)] || words[0] || ""];
         }
-        lines.push(currentLine);
-        return lines;
+        const fullWidth = measureTextWithSpacing(ctx, text, globalLetterSpacing);
+        if (fullWidth > maxWidth) return wrapText(ctx, text, maxWidth, globalLetterSpacing);
+        return [text];
     };
 
-    // Calculate final lines
-    let finalLines: string[] = [cue.text];
-    if (style.displayMode !== 'single-word') {
-         const fullWidth = measureTextWithSpacing(ctx, cue.text, globalLetterSpacing);
-         if (fullWidth > maxWidth) {
-             finalLines = wrapText(ctx, cue.text, maxWidth);
-         }
-    } else {
-        // Single word mode
-        finalLines = [words[Math.max(0, activeIdx)] || words[0] || ""];
+    const translatedLines = wrapLines(translatedText, maxWidth);
+    let originalLines: string[] = [];
+    const originalFontSize = fontSize * 0.65;
+    const lineGap = fontSize * 0.25;
+
+    if (originalText && isBilingual) {
+        ctx.save();
+        ctx.font = `${fontWeight} ${originalFontSize}px "${mappedFontName}"${fontFallback}`;
+        originalLines = wrapLines(originalText, maxWidth);
+        ctx.restore();
     }
 
     const lineHeight = fontSize * 1.2;
-    
-    // Calculate dimensions of the *block* for background/animations
-    // Width is the max width of any line
-    const textWidth = Math.max(...finalLines.map(line => measureTextWithSpacing(ctx, line, globalLetterSpacing)));
-    const textHeight = finalLines.length * lineHeight;
+    const originalLineHeight = originalFontSize * 1.2;
 
-    // Adjust Y position based on lines
-    if (style.position !== 'top' && style.position !== 'center') {
-        // Bottom anchor (default) grows up
-        y -= (finalLines.length - 1) * lineHeight;
-    }
-    if (style.position === 'center') {
-        y -= ((finalLines.length - 1) * lineHeight) / 2;
-    }
+    // Calculate Dimensions
+    const translatedTextWidth = Math.max(...translatedLines.map((line: string) => measureTextWithSpacing(ctx, line, globalLetterSpacing)));
+    const translatedTextHeight = translatedLines.length * lineHeight;
 
-    // 5. Drawing Content Logic
-    if (style.displayMode === 'single-word') {
-        const currentWord = finalLines[0];
-
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(globalRotate * Math.PI / 180);
-        if (globalSkewX || globalSkewY) {
-            ctx.transform(1, Math.tan(toRadians(globalSkewY)), Math.tan(toRadians(globalSkewX)), 1, 0, 0);
-        }
-        ctx.scale(globalScale * globalScaleX, globalScale * globalScaleY);
-        ctx.globalAlpha = globalAlpha;
-
-        const isNeon = (style.effect as string) === 'neon' || (style.shadowBlur ?? 0) > 15;
-        const neonShadows: ShadowSpec[] | undefined = isNeon ? [
-            { offsetX: (style.shadowOffsetX || 0) * canvasScale, offsetY: (style.shadowOffsetY || 0) * canvasScale, blur: (style.shadowBlur ?? 20) * 0.4, color: '#FFFFFF' }, 
-            { offsetX: (style.shadowOffsetX || 0) * canvasScale, offsetY: (style.shadowOffsetY || 0) * canvasScale, blur: (style.shadowBlur ?? 20) * 1.0, color: style.shadowColor || style.primaryColor || '#00FFFF' },
-            { offsetX: (style.shadowOffsetX || 0) * canvasScale, offsetY: (style.shadowOffsetY || 0) * canvasScale, blur: (style.shadowBlur ?? 20) * 2.5, color: style.shadowColor || style.primaryColor || '#00FFFF' },
-            { offsetX: (style.shadowOffsetX || 0) * canvasScale, offsetY: (style.shadowOffsetY || 0) * canvasScale, blur: (style.shadowBlur ?? 20) * 4.5, color: style.shadowColor || style.primaryColor || '#00FFFF' },
-        ] : undefined;
-
-        if (isNeon && neonShadows) {
-            drawMultiLineText(ctx, currentWord, 0, 0, fontSize * 1.2, globalLetterSpacing, 'fill', neonShadows, true);
-        }
-
-        if (style.outlineWidth && !isNeon) {
-            ctx.strokeStyle = style.outlineColor || '#000000';
-            ctx.lineWidth = style.outlineWidth * 2 * SCALE_FACTOR;
-            drawMultiLineText(ctx, currentWord, 0, 0, fontSize * 1.2, globalLetterSpacing, 'stroke');
-        }
-
-        ctx.fillStyle = style.primaryColor || '#FFFFFF';
-        drawMultiLineText(ctx, currentWord, 0, 0, fontSize * 1.2, globalLetterSpacing, 'fill');
-
-        if (isNeon && style.strokeWidth) {
-             ctx.strokeStyle = style.strokeColor || '#FFFFFF';
-             ctx.lineWidth = style.strokeWidth * 2 * SCALE_FACTOR;
-             ctx.lineJoin = 'round';
-             drawMultiLineText(ctx, currentWord, 0, 0, fontSize * 1.2, globalLetterSpacing, 'stroke');
-        }
-        ctx.restore();
-    } else if (style.effect === 'typewriter') {
-        const charCount = cue.text.length;
-        const visibleChars = Math.floor(progress * charCount);
-        const visibleText = cue.text.slice(0, visibleChars);
-
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(globalRotate * Math.PI / 180);
-        if (globalSkewX || globalSkewY) {
-            ctx.transform(1, Math.tan(toRadians(globalSkewY)), Math.tan(toRadians(globalSkewX)), 1, 0, 0);
-        }
-        ctx.scale(globalScale * globalScaleX, globalScale * globalScaleY);
-
-        const isNeon = (style.effect as string) === 'neon' || (style.shadowBlur ?? 0) > 15;
-        const neonShadows: ShadowSpec[] | undefined = isNeon ? [
-            { offsetX: (style.shadowOffsetX || 0) * canvasScale, offsetY: (style.shadowOffsetY || 0) * canvasScale, blur: (style.shadowBlur ?? 20) * 0.4, color: '#FFFFFF' }, 
-            { offsetX: (style.shadowOffsetX || 0) * canvasScale, offsetY: (style.shadowOffsetY || 0) * canvasScale, blur: (style.shadowBlur ?? 20) * 1.0, color: style.shadowColor || style.primaryColor || '#00FFFF' },
-            { offsetX: (style.shadowOffsetX || 0) * canvasScale, offsetY: (style.shadowOffsetY || 0) * canvasScale, blur: (style.shadowBlur ?? 20) * 2.5, color: style.shadowColor || style.primaryColor || '#00FFFF' },
-            { offsetX: (style.shadowOffsetX || 0) * canvasScale, offsetY: (style.shadowOffsetY || 0) * canvasScale, blur: (style.shadowBlur ?? 20) * 4.5, color: style.shadowColor || style.primaryColor || '#00FFFF' },
-        ] : undefined;
-
-        if (isNeon && neonShadows) {
-            drawMultiLineText(ctx, visibleText, 0, 0, fontSize * 1.2, globalLetterSpacing, 'fill', neonShadows, true);
-        }
-
-        if (style.outlineWidth && !isNeon) {
-            ctx.strokeStyle = style.outlineColor || '#000000';
-            ctx.lineWidth = style.outlineWidth * 2;
-            drawMultiLineText(ctx, visibleText, 0, 0, fontSize * 1.2, globalLetterSpacing, 'stroke');
-        }
-        ctx.fillStyle = style.primaryColor || '#FFFFFF';
-        drawMultiLineText(ctx, visibleText, 0, 0, fontSize * 1.2, globalLetterSpacing, 'fill');
-
-        if (isNeon && style.strokeWidth) {
-             ctx.strokeStyle = style.strokeColor || '#FFFFFF';
-             ctx.lineWidth = style.strokeWidth * 2;
-             ctx.lineJoin = 'round';
-             drawMultiLineText(ctx, visibleText, 0, 0, fontSize * 1.2, globalLetterSpacing, 'stroke');
-        }
-        ctx.restore();
-    } else if (!preset || preset.scope === 'line') {
-        // Line-scope or standard
-        ctx.save();
-        if (preset?.scope === 'line') {
-            const entry = preset.entry;
-            const exit = preset.exit;
-            const entryDur = (entry?.type === 'lineClipReveal' ? entry.duration : 0.3);
-            const leaveTime = cue.endTime - currentTime;
-            const exitDur = (exit?.type === 'lineClipReveal' ? exit.duration : 0.3);
-
-            if (elapsed < entryDur && entry?.type === 'lineClipReveal') {
-                const p = Math.max(0, Math.min(1, elapsed / entryDur));
-                const dir = entry.direction;
-                ctx.beginPath();
-                if (dir === 'ltr') ctx.rect(x - textWidth / 2, y - textHeight / 2, textWidth * p, textHeight);
-                if (dir === 'rtl') ctx.rect(x + textWidth / 2 - textWidth * p, y - textHeight / 2, textWidth * p, textHeight);
-                if (dir === 'btt') ctx.rect(x - textWidth / 2, y + textHeight / 2 - textHeight * p, textWidth, textHeight * p);
-                if (dir === 'ttb') ctx.rect(x - textWidth / 2, y - textHeight / 2, textWidth, textHeight * p);
-                ctx.clip();
-            } else if (leaveTime < exitDur && exit?.type === 'lineClipReveal') {
-                const p = Math.max(0, Math.min(1, leaveTime / exitDur));
-                const dir = exit.direction;
-                ctx.beginPath();
-                if (dir === 'ltr') ctx.rect(x - textWidth / 2 + textWidth * (1 - p), y - textHeight / 2, textWidth * p, textHeight);
-                if (dir === 'rtl') ctx.rect(x - textWidth / 2, y - textHeight / 2, textWidth * p, textHeight);
-                ctx.clip();
-            }
-        }
-
-        // Background Box
-        if (style.backgroundColor && style.backgroundColor !== 'transparent') {
-            const paddingH = fontSize * 0.5;
-            const paddingV = fontSize * 0.2;
-            const boxWidth = textWidth + paddingH * 2;
-            const boxHeight = textHeight + paddingV * 2;
-
+    const originalTextWidth = originalLines.length > 0
+        ? Math.max(...originalLines.map((line: string) => {
             ctx.save();
-            ctx.translate(x, y);
-            ctx.rotate(globalRotate * Math.PI / 180);
-            if (globalSkewX || globalSkewY) {
-                ctx.transform(1, Math.tan(toRadians(globalSkewY)), Math.tan(toRadians(globalSkewX)), 1, 0, 0);
-            }
-            ctx.scale(globalScale * globalScaleX, globalScale * globalScaleY);
-            ctx.fillStyle = style.backgroundColor;
-            ctx.beginPath();
-            
-            // roundRect support check
-            if (typeof ctx.roundRect === 'function') {
-                ctx.roundRect(-boxWidth / 2, -boxHeight / 2, boxWidth, boxHeight, 8);
-            } else {
-                 ctx.rect(-boxWidth / 2, -boxHeight / 2, boxWidth, boxHeight);
-            }
-            ctx.fill();
+            ctx.font = `${fontWeight} ${originalFontSize}px "${mappedFontName}"${fontFallback}`;
+            const w = measureTextWithSpacing(ctx, line, globalLetterSpacing);
             ctx.restore();
-        }
+            return w;
+          }))
+        : 0;
+    const originalTextHeight = originalLines.length > 0 ? originalLines.length * originalLineHeight : 0;
 
-        // Text
+    const totalBlockHeight = translatedTextHeight + (originalLines.length > 0 ? originalTextHeight + lineGap : 0);
+
+    // Initial Y positioning
+    let targetY = y;
+    if (style.position !== 'top' && style.position !== 'center') {
+        targetY -= (totalBlockHeight - lineHeight) / 2;
+    } else if (style.position === 'center') {
+        targetY -= (totalBlockHeight - lineHeight) / 2;
+    } else if (style.position === 'top') {
+        targetY += (totalBlockHeight - lineHeight) / 2;
+    }
+    const blockCenterY = targetY;
+
+    const mainY = blockCenterY + (originalLines.length > 0 ? (originalTextHeight + lineGap) / 2 : 0);
+    const originalY = mainY - (translatedTextHeight / 2) - (originalTextHeight / 2) - lineGap;
+
+    // Unified dimensions for background/clipping
+    const textWidth = Math.max(translatedTextWidth, originalTextWidth);
+    const textHeight = totalBlockHeight;
+
+    // Shared Helper for Text Blocks
+    const isNeon = (style.effect as string) === 'neon' || (globalTextShadow && globalTextShadow.blur > 15) || (style.shadowBlur ?? 0) > 15;
+    const drawTextBlock = (lines: string[], fSize: number, lHeight: number, blockY: number, isOriginal = false, maxChars?: number) => {
         ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(globalRotate * Math.PI / 180);
-        if (globalSkewX || globalSkewY) {
-            ctx.transform(1, Math.tan(toRadians(globalSkewY)), Math.tan(toRadians(globalSkewX)), 1, 0, 0);
+        const fullText = lines.join('\n');
+        if (isOriginal) {
+            ctx.font = `${fontWeight} ${fSize}px "${mappedFontName}"${fontFallback}`;
+            ctx.globalAlpha *= 0.7;
         }
-        ctx.scale(globalScale * globalScaleX, globalScale * globalScaleY);
 
         if (globalTextShadow) {
             applyShadow(ctx, {
@@ -815,61 +739,136 @@ export const renderSubtitleFrame = (
             });
         }
 
-        const isNeon = (style.effect as string) === 'neon' || (globalTextShadow && globalTextShadow.blur > 15) || (style.shadowBlur ?? 0) > 15;
-        
         if (isNeon) {
             const baseBlur = globalTextShadow?.blur || (style.shadowBlur ?? 20);
             const baseColor = globalTextShadow?.color || style.shadowColor || style.primaryColor || '#00FFFF';
             const baseOffX = (globalTextShadow?.offsetX ?? (style.shadowOffsetX || 0)) * canvasScale * SCALE_FACTOR;
             const baseOffY = (globalTextShadow?.offsetY ?? (style.shadowOffsetY || 0)) * canvasScale * SCALE_FACTOR;
-
             const neonShadows: ShadowSpec[] = [
-                { offsetX: baseOffX, offsetY: baseOffY, blur: baseBlur * 0.4, color: '#FFFFFF' }, 
-                { offsetX: baseOffX, offsetY: baseOffY, blur: baseBlur * 1.0, color: baseColor }, 
-                { offsetX: baseOffX, offsetY: baseOffY, blur: baseBlur * 2.5, color: baseColor }, 
+                { offsetX: baseOffX, offsetY: baseOffY, blur: baseBlur * 0.4, color: '#FFFFFF' },
+                { offsetX: baseOffX, offsetY: baseOffY, blur: baseBlur * 1.0, color: baseColor },
+                { offsetX: baseOffX, offsetY: baseOffY, blur: baseBlur * 2.5, color: baseColor },
                 { offsetX: baseOffX, offsetY: baseOffY, blur: baseBlur * 4.5, color: baseColor },
             ];
-            // 1. Draw shadows only (multiple layers)
-            drawMultiLineText(ctx, finalLines.join('\n'), 0, 0, fontSize * 1.2, globalLetterSpacing, 'fill', neonShadows, true);
+            drawMultiLineText(ctx, fullText, 0, blockY - mainY, lHeight, globalLetterSpacing, 'fill', neonShadows, true, maxChars);
         }
 
-        // 2. Outlines/Strokes for non-neon
         if (!isNeon) {
             if (style.outlineWidth) {
                 ctx.strokeStyle = style.outlineColor || '#000000';
                 ctx.lineWidth = (style.outlineWidth + (style.strokeWidth || 0)) * 2 * SCALE_FACTOR;
                 ctx.lineJoin = 'round';
-                drawMultiLineText(ctx, finalLines.join('\n'), 0, 0, fontSize * 1.2, globalLetterSpacing, 'stroke');
+                drawMultiLineText(ctx, fullText, 0, blockY - mainY, lHeight, globalLetterSpacing, 'stroke', undefined, false, maxChars);
             }
-
             if (style.strokeWidth) {
                 ctx.strokeStyle = style.strokeColor || '#000000';
                 ctx.lineWidth = style.strokeWidth * 2 * SCALE_FACTOR;
                 ctx.lineJoin = 'round';
-                drawMultiLineText(ctx, finalLines.join('\n'), 0, 0, fontSize * 1.2, globalLetterSpacing, 'stroke');
+                drawMultiLineText(ctx, fullText, 0, blockY - mainY, lHeight, globalLetterSpacing, 'stroke', undefined, false, maxChars);
             }
         }
 
         resetShadow(ctx);
         ctx.fillStyle = style.primaryColor || '#FFFFFF';
-        
         if (isNeon) {
-            // 3. Draw Fill for Neon
-            drawMultiLineText(ctx, finalLines.join('\n'), 0, 0, fontSize * 1.2, globalLetterSpacing, 'fill');
-            
-            // 4. Draw Stroke ON TOP for Neon (this creates the white core)
+            drawMultiLineText(ctx, fullText, 0, blockY - mainY, lHeight, globalLetterSpacing, 'fill', undefined, false, maxChars);
             if (style.strokeWidth) {
                 ctx.strokeStyle = style.strokeColor || '#FFFFFF';
                 ctx.lineWidth = style.strokeWidth * 2;
                 ctx.lineJoin = 'round';
-                drawMultiLineText(ctx, finalLines.join('\n'), 0, 0, fontSize * 1.2, globalLetterSpacing, 'stroke');
+                drawMultiLineText(ctx, fullText, 0, blockY - mainY, lHeight, globalLetterSpacing, 'stroke', undefined, false, maxChars);
             }
         } else {
-            drawMultiLineText(ctx, finalLines.join('\n'), 0, 0, fontSize * 1.2, globalLetterSpacing, 'fill');
+            drawMultiLineText(ctx, fullText, 0, blockY - mainY, lHeight, globalLetterSpacing, 'fill', undefined, false, maxChars);
         }
 
         ctx.restore();
+    };
 
+    // 5. Drawing Content Logic
+    if (style.displayMode === 'single-word' || style.effect === 'typewriter' || !preset || preset.scope === 'line') {
+        const isTypewriter = style.effect === 'typewriter';
+        const isSingleWord = style.displayMode === 'single-word';
+        const isLineScope = !isSingleWord && (!preset || preset.scope === 'line');
+        const isClipReveal = isLineScope && preset?.entry?.type === 'lineClipReveal';
+
+        ctx.save();
+        
+        // Handle Clip Reveal
+        if (isLineScope && preset?.scope === 'line') {
+            const entry = preset.entry;
+            const exit = preset.exit;
+            const entryDur = (entry?.type === 'lineClipReveal' ? entry.duration : 0.3);
+            const leaveTime = cue.endTime - currentTime;
+            const exitDur = (exit?.type === 'lineClipReveal' ? exit.duration : 0.3);
+
+            if (elapsed < entryDur && entry?.type === 'lineClipReveal') {
+                const p = Math.max(0, Math.min(1, elapsed / entryDur));
+                const dir = entry.direction;
+                ctx.beginPath();
+                if (dir === 'ltr') ctx.rect(x - textWidth / 2, blockCenterY - textHeight / 2, textWidth * p, textHeight);
+                if (dir === 'rtl') ctx.rect(x + textWidth / 2 - textWidth * p, blockCenterY - textHeight / 2, textWidth * p, textHeight);
+                if (dir === 'btt') ctx.rect(x - textWidth / 2, blockCenterY + textHeight / 2 - textHeight * p, textWidth, textHeight * p);
+                if (dir === 'ttb') ctx.rect(x - textWidth / 2, blockCenterY - textHeight / 2, textWidth, textHeight * p);
+                ctx.clip();
+            } else if (leaveTime < exitDur && exit?.type === 'lineClipReveal') {
+                const p = Math.max(0, Math.min(1, leaveTime / exitDur));
+                const dir = exit.direction;
+                ctx.beginPath();
+                if (dir === 'ltr') ctx.rect(x - textWidth / 2 + textWidth * (1 - p), blockCenterY - textHeight / 2, textWidth * p, textHeight);
+                if (dir === 'rtl') ctx.rect(x - textWidth / 2, blockCenterY - textHeight / 2, textWidth * p, textHeight);
+                ctx.clip();
+            }
+        }
+
+        // Background Box
+        if (style.backgroundColor && style.backgroundColor !== 'transparent') {
+            const paddingH = fontSize * 0.5;
+            const paddingV = fontSize * 0.2;
+            const boxWidth = textWidth + paddingH * 2;
+            const boxHeight = textHeight + paddingV * 2;
+
+            ctx.save();
+            ctx.translate(x, blockCenterY);
+            ctx.rotate(globalRotate * Math.PI / 180);
+            if (globalSkewX || globalSkewY) {
+                ctx.transform(1, Math.tan(toRadians(globalSkewY)), Math.tan(toRadians(globalSkewX)), 1, 0, 0);
+            }
+            ctx.scale(globalScale * globalScaleX, globalScale * globalScaleY);
+            ctx.fillStyle = style.backgroundColor;
+            ctx.beginPath();
+            if (typeof ctx.roundRect === 'function') {
+                ctx.roundRect(-boxWidth / 2, -boxHeight / 2, boxWidth, boxHeight, 8 * (fontSize / 24));
+            } else {
+                 ctx.rect(-boxWidth / 2, -boxHeight / 2, boxWidth, boxHeight);
+            }
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // Text Drawing
+        ctx.save();
+        ctx.translate(x, mainY);
+        ctx.rotate(globalRotate * Math.PI / 180);
+        if (globalSkewX || globalSkewY) {
+            ctx.transform(1, Math.tan(toRadians(globalSkewY)), Math.tan(toRadians(globalSkewX)), 1, 0, 0);
+        }
+        ctx.scale(globalScale * globalScaleX, globalScale * globalScaleY);
+
+        let maxChars: number | undefined;
+        if (isTypewriter) {
+            maxChars = Math.floor(progress * translatedText.length);
+        }
+
+        // 1. Draw Original if exists
+        if (originalLines.length > 0) {
+            drawTextBlock(originalLines, originalFontSize, originalLineHeight, originalY, true);
+        }
+
+        // 2. Draw Translated
+        drawTextBlock(translatedLines, fontSize, lineHeight, mainY, false, maxChars);
+
+        ctx.restore();
         ctx.restore();
 
     } else if (preset.scope === 'word' || preset.active?.type?.startsWith('word')) {
@@ -892,16 +891,16 @@ export const renderSubtitleFrame = (
             return b;
         });
 
-        // Layout Transition State (Framer Motion layoutId simulation)
+        // Layout Transition State
         let layoutRectX = 0;
         let layoutRectW = 0;
-        const layoutTransitionDur = 0.18; // Seconds
+        const layoutTransitionDur = 0.18;
 
         if (activeIdx >= 0) {
             const currentBound = wordBounds[activeIdx];
             const prevBound = activeIdx > 0 ? wordBounds[activeIdx - 1] : currentBound;
 
-            const wordStart = cue.words?.[activeIdx]?.start ?? (cue.startTime + (activeIdx / words.length) * (cue.endTime - cue.startTime));
+            const wordStart = wordTimings[activeIdx].start;
             const timeInWord = currentTime - wordStart;
             const layoutT = clamp(timeInWord / layoutTransitionDur);
             const layoutEase = Easing.easeOut(layoutT);
@@ -911,15 +910,20 @@ export const renderSubtitleFrame = (
         }
 
         ctx.save();
-        ctx.translate(x, y);
+        ctx.translate(x, mainY); // Use mainY instead of y
         ctx.rotate(globalRotate * Math.PI / 180);
         if (globalSkewX || globalSkewY) {
             ctx.transform(1, Math.tan(toRadians(globalSkewY)), Math.tan(toRadians(globalSkewX)), 1, 0, 0);
         }
         ctx.scale(globalScale * globalScaleX, globalScale * globalScaleY);
-        ctx.translate(-x, -y);
+        ctx.translate(-x, -mainY);
 
-        // 5a. Shared Layout Background Decoration (Moving highlight)
+        // Draw Original if exists (static above the words)
+        if (originalLines.length > 0) {
+            drawTextBlock(originalLines, originalFontSize, originalLineHeight, originalY, true);
+        }
+
+        // Shared Layout Background Decoration
         if (activeIdx >= 0 && activeConfig?.type === 'wordDecorToggle') {
             const decorType = activeConfig.decor;
             if (decorType === 'pillBehind' || decorType === 'boxBehind') {
@@ -932,7 +936,7 @@ export const renderSubtitleFrame = (
                 const rectH = fontSize + padY * 2;
 
                 ctx.save();
-                ctx.translate(layoutRectX, y);
+                ctx.translate(layoutRectX, mainY); // Use mainY
                 ctx.globalAlpha = decorOpacity;
                 ctx.fillStyle = highlightColor;
                 ctx.beginPath();
@@ -953,12 +957,11 @@ export const renderSubtitleFrame = (
         words.forEach((word, i) => {
             const bound = wordBounds[i];
             const wordX = bound.x;
-            const wordWidth = bound.w;
             const isActive = i === activeIdx;
             const progressValue = isActive ? getWordProgress(i) : (i < activeIdx ? 1 : 0);
 
             ctx.save();
-            ctx.translate(wordX, y);
+            ctx.translate(wordX, mainY); // Use mainY
 
             let wordOpacity = 1;
             let wordScaleX = 1;
@@ -973,7 +976,6 @@ export const renderSubtitleFrame = (
             let wordSkewY = 0;
             let wordTextShadow: ShadowSpec | undefined;
 
-            // Base shadow from global style if present
             if (activeConfig?.type !== 'wordMotion' && style.shadowBlur) {
                 wordTextShadow = {
                     offsetX: (style.shadowOffsetX || 0) * canvasScale,
@@ -1019,8 +1021,6 @@ export const renderSubtitleFrame = (
                 wordOpacity *= activeConfig.inactiveOpacity ?? 0.5;
             }
 
-            const boundWidth = measureTextWithSpacing(ctx, word, wordLetterSpacing);
-
             ctx.translate(wordXOffset, wordYOffset);
             if (wordRotate) ctx.rotate(wordRotate * Math.PI / 180);
             if (wordSkewX || wordSkewY) {
@@ -1030,30 +1030,26 @@ export const renderSubtitleFrame = (
             ctx.globalAlpha = baseAlpha * wordOpacity;
             if (wordFilter && ctx.filter) ctx.filter = wordFilter;
 
-            // decorations (back)
+            // decorations
             if (isActive && activeConfig?.type === 'wordDecorToggle') {
                 const decorType = activeConfig.decor;
-                const padX = (activeConfig.paddingX ?? 0) * canvasScale * SCALE_FACTOR;
-                const padY = (activeConfig.paddingY ?? 0) * canvasScale * SCALE_FACTOR;
-                const radius = (activeConfig.radius ?? 4) * canvasScale * SCALE_FACTOR;
-
-                // Animation for decoration entry (for non-moving types)
+                const highlightAlpha = style.highlightOpacity ?? 1;
                 const decorT = Easing.spring(progressValue, 350, 25);
                 const decorOpacity = (activeConfig.opacity ?? 1) * highlightAlpha * Math.min(1, decorT * 1.5);
                 const decorScale = 0.8 + 0.2 * decorT;
 
                 if (decorType === 'underlineStatic' || decorType === 'overlineStatic' || decorType === 'strikeStatic') {
-                    const lineHeight = (activeConfig.height ?? 4) * canvasScale * SCALE_FACTOR;
-                    const offsetY = (activeConfig.offsetY ?? (decorType === 'underlineStatic' ? 8 : (decorType === 'overlineStatic' ? -10 : 0))) * canvasScale * SCALE_FACTOR;
+                    const lHeight = (activeConfig.height ?? 4) * canvasScale * SCALE_FACTOR;
+                    const offY = (activeConfig.offsetY ?? (decorType === 'underlineStatic' ? 8 : (decorType === 'overlineStatic' ? -10 : 0))) * canvasScale * SCALE_FACTOR;
                     ctx.save();
-                    ctx.scale(decorT, 1); // Expand from center
+                    ctx.scale(decorT, 1);
                     ctx.globalAlpha *= decorOpacity;
                     ctx.strokeStyle = highlightColor;
-                    ctx.lineWidth = lineHeight;
+                    ctx.lineWidth = lHeight;
                     ctx.lineCap = 'round';
                     ctx.beginPath();
-                    ctx.moveTo(-wordWidth / 2, offsetY);
-                    ctx.lineTo(wordWidth / 2, offsetY);
+                    ctx.moveTo(-bound.w / 2, offY);
+                    ctx.lineTo(bound.w / 2, offY);
                     ctx.stroke();
                     ctx.restore();
                 }
@@ -1067,19 +1063,17 @@ export const renderSubtitleFrame = (
                     ctx.globalAlpha *= decorOpacity;
                     ctx.strokeStyle = highlightColor;
                     ctx.lineWidth = thickness;
-                    // Left bracket
                     ctx.beginPath();
-                    ctx.moveTo(-wordWidth / 2 - gap + bLen, -fontSize / 2);
-                    ctx.lineTo(-wordWidth / 2 - gap, -fontSize / 2);
-                    ctx.lineTo(-wordWidth / 2 - gap, fontSize / 2);
-                    ctx.lineTo(-wordWidth / 2 - gap + bLen, fontSize / 2);
+                    ctx.moveTo(-bound.w / 2 - gap + bLen, -fontSize / 2);
+                    ctx.lineTo(-bound.w / 2 - gap, -fontSize / 2);
+                    ctx.lineTo(-bound.w / 2 - gap, fontSize / 2);
+                    ctx.lineTo(-bound.w / 2 - gap + bLen, fontSize / 2);
                     ctx.stroke();
-                    // Right bracket
                     ctx.beginPath();
-                    ctx.moveTo(wordWidth / 2 + gap - bLen, -fontSize / 2);
-                    ctx.lineTo(wordWidth / 2 + gap, -fontSize / 2);
-                    ctx.lineTo(wordWidth / 2 + gap, fontSize / 2);
-                    ctx.lineTo(wordWidth / 2 + gap - bLen, fontSize / 2);
+                    ctx.moveTo(bound.w / 2 + gap - bLen, -fontSize / 2);
+                    ctx.lineTo(bound.w / 2 + gap, -fontSize / 2);
+                    ctx.lineTo(bound.w / 2 + gap, fontSize / 2);
+                    ctx.lineTo(bound.w / 2 + gap - bLen, fontSize / 2);
                     ctx.stroke();
                     ctx.restore();
                 }
@@ -1092,15 +1086,14 @@ export const renderSubtitleFrame = (
                     ctx.fillStyle = highlightColor;
                     ctx.font = `italic bold ${fontSize * 0.8}px serif`;
                     ctx.textAlign = 'right';
-                    ctx.fillText('"', -wordWidth / 2 - gap, fontSize * 0.2);
+                    ctx.fillText('"', -bound.w / 2 - gap, fontSize * 0.2);
                     ctx.textAlign = 'left';
-                    ctx.fillText('"', wordWidth / 2 + gap, fontSize * 0.2);
+                    ctx.fillText('"', bound.w / 2 + gap, fontSize * 0.2);
                     ctx.restore();
                 }
             }
 
             const isNeon = (style.effect as string) === 'neon' || (wordTextShadow && wordTextShadow.blur > 15);
-            
             if (isNeon && wordTextShadow) {
                 const neonShadows: ShadowSpec[] = [
                     { ...wordTextShadow, blur: wordTextShadow.blur * 0.4, color: '#FFFFFF' }, 
@@ -1108,16 +1101,10 @@ export const renderSubtitleFrame = (
                     { ...wordTextShadow, blur: wordTextShadow.blur * 2.5 },
                     { ...wordTextShadow, blur: wordTextShadow.blur * 4.5 },
                 ];
-                // 1. Draw Shadows only (multiple layers)
                 drawMultiLineText(ctx, word, 0, 0, fontSize * 1.2, wordLetterSpacing, 'fill', neonShadows, true);
-
-                
-                // 2. Draw Fill
                 resetShadow(ctx);
                 ctx.fillStyle = style.primaryColor || '#FFFFFF';
                 drawTextWithSpacing(ctx, word, 0, 0, wordLetterSpacing, 'fill');
-
-                // 3. Draw Stroke ON TOP
                 if (style.strokeWidth) {
                     ctx.strokeStyle = style.strokeColor || '#FFFFFF';
                     ctx.lineWidth = style.strokeWidth * 2 * SCALE_FACTOR;
@@ -1125,7 +1112,6 @@ export const renderSubtitleFrame = (
                     drawTextWithSpacing(ctx, word, 0, 0, wordLetterSpacing, 'stroke');
                 }
             } else {
-                // Non-neon Word Stroke/Outline
                 if (style.outlineWidth) {
                     ctx.strokeStyle = style.outlineColor || '#000000';
                     ctx.lineWidth = (style.outlineWidth + (style.strokeWidth || 0)) * 2 * SCALE_FACTOR;
@@ -1138,16 +1124,12 @@ export const renderSubtitleFrame = (
                     ctx.lineJoin = 'round';
                     drawTextWithSpacing(ctx, word, 0, 0, wordLetterSpacing, 'stroke');
                 }
-
                 ctx.fillStyle = style.primaryColor || '#FFFFFF';
                 drawTextWithSpacing(ctx, word, 0, 0, wordLetterSpacing, 'fill');
             }
-
-            
             resetShadow(ctx);
             ctx.restore();
         });
-
         ctx.restore();
     }
     

@@ -75,6 +75,9 @@ export function CutTimeline({
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [zoomLevel, setZoomLevel] = useState(100); // Percentage: 100% = 10px per second
     const pps = (zoomLevel / 100) * 10; // Pixels per second
+
+    // Horizontal offset for the track label/sidebar area
+    const TRACK_LABEL_WIDTH = 56;
     const [selectionRange, setSelectionRange] = useState<{ start: number; end: number } | null>(null);
     const [dragInfo, setDragInfo] = useState<{
         type: 'move' | 'start' | 'end' | 'playhead' | 'selection';
@@ -274,7 +277,7 @@ export function CutTimeline({
             }
 
             if (type === 'selection') {
-                const currentX = e.clientX - rect.left;
+                const currentX = (e.clientX - rect.left) - TRACK_LABEL_WIDTH;
                 setSelectionRange(prev => prev ? { ...prev, end: Math.max(0, currentX / pps) } : null);
                 return;
             }
@@ -384,6 +387,15 @@ export function CutTimeline({
                     >
                         <Scissors className="size-3.5" />
                         Split
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 gap-2 text-[10px] font-black uppercase tracking-tighter"
+                        onClick={() => addLayer(undefined, undefined, 'audio')}
+                    >
+                        <Music className="size-3.5" />
+                        Add Audio
                     </Button>
                     {selectionRange && (
                         <Button
@@ -505,14 +517,19 @@ export function CutTimeline({
                         if (e.button !== 0) return; // Only left click for seeking/dragging
                         const rect = trackRef.current?.getBoundingClientRect();
                         if (!rect) return;
-                        const clickX = e.clientX - rect.left;
+                        const clickX = (e.clientX - rect.left) - TRACK_LABEL_WIDTH;
                         const clickTime = clickX / pps;
 
                         const isRuler = (e.clientY - rect.top) < 28;
+                        const isLabelArea = (e.clientX - rect.left) < TRACK_LABEL_WIDTH;
+
+                        if (isLabelArea && !isRuler) return; // Don't seek when clicking layer labels
+
                         const isSelectionDrag = e.altKey || isRuler;
 
                         if (isSelectionDrag) {
-                            setSelectionRange({ start: clickTime, end: clickTime });
+                            const startTime = Math.max(0, clickTime);
+                            setSelectionRange({ start: startTime, end: startTime });
                             setDragInfo({
                                 type: 'selection',
                                 startX: e.clientX,
@@ -521,7 +538,8 @@ export function CutTimeline({
                             });
                         } else {
                             // Seek
-                            let remaining = clickTime;
+                            const seekingTime = Math.max(0, clickTime);
+                            let remaining = seekingTime;
                             let matched = false;
                             for (const c of clipsWithOffsets) {
                                 if (remaining <= c.clipDuration) {
@@ -539,23 +557,25 @@ export function CutTimeline({
                                 startX: e.clientX,
                                 initialStart: 0,
                                 initialEnd: 0,
-                                initialPlayheadTime: clickTime
+                                initialPlayheadTime: seekingTime
                             });
                         }
                     }}
                 >
                     {/* Time Ruler */}
                     <div className="absolute top-0 left-0 right-0 h-7 border-b bg-card/90 backdrop-blur-sm z-30">
-                        {timeMarkers.map(t => (
-                            <div
-                                key={t}
-                                className="absolute top-0 border-l border-border h-full flex flex-col justify-end"
-                                style={{ left: t * pps }}
-                            >
-                                <span className="text-[9px] font-mono text-muted-foreground ml-1.5 mb-0.5">{formatTime(t)}</span>
-                                <div className="absolute bottom-0 left-0 w-px h-1.5 bg-muted-foreground/30" />
-                            </div>
-                        ))}
+                        <div className="absolute inset-y-0" style={{ left: TRACK_LABEL_WIDTH }}>
+                            {timeMarkers.map(t => (
+                                <div
+                                    key={t}
+                                    className="absolute top-0 border-l border-border h-full flex flex-col justify-end"
+                                    style={{ left: t * pps }}
+                                >
+                                    <span className="text-[9px] font-mono text-muted-foreground ml-1.5 mb-0.5">{formatTime(t)}</span>
+                                    <div className="absolute bottom-0 left-0 w-px h-1.5 bg-muted-foreground/30" />
+                                </div>
+                            ))}
+                        </div>
                     </div>
 
                     {/* Top Placeholder */}
@@ -564,6 +584,7 @@ export function CutTimeline({
                         onDragLeave={e => e.currentTarget.classList.remove('bg-primary/20', 'border-primary/50')}
                         onDrop={e => { e.currentTarget.classList.remove('bg-primary/20', 'border-primary/50'); handleDropOnPlaceholder(e); }}
                         className="h-6 border-b border-dashed border-border/50 flex items-center justify-center transition-all group/new-track"
+                        style={{ paddingLeft: TRACK_LABEL_WIDTH }}
                     >
                         <Plus className="size-3.5 text-muted-foreground/20 group-hover/new-track:text-primary transition-all" />
                     </div>
@@ -595,7 +616,10 @@ export function CutTimeline({
                                 )}
                             >
                                 {/* Track Label/Icon */}
-                                <div className="w-8 flex flex-col items-center justify-center border-r bg-muted/20 text-muted-foreground/40 shrink-0">
+                                <div
+                                    className="flex flex-col items-center justify-center border-r bg-muted/20 text-muted-foreground/40 shrink-0"
+                                    style={{ width: TRACK_LABEL_WIDTH }}
+                                >
                                     {layer.type === 'video' && <Video className="size-3" />}
                                     {layer.type === 'audio' && <Music className="size-3" />}
                                     {layer.type === 'caption' && <Type className="size-3" />}
@@ -759,6 +783,7 @@ export function CutTimeline({
                             } catch { }
                         }}
                         className="h-8 mt-1 border border-dashed border-transparent rounded-lg flex items-center justify-center transition-all hover:border-border/50 hover:bg-muted/5 group"
+                        style={{ paddingLeft: TRACK_LABEL_WIDTH }}
                     >
                         <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/0 group-hover:text-muted-foreground/30 transition-all">Drop here to add new track</span>
                     </div>
@@ -767,7 +792,7 @@ export function CutTimeline({
                         <div
                             className="absolute top-0 bottom-0 bg-primary/20 border-x border-primary/50 z-20 pointer-events-none"
                             style={{
-                                left: Math.min(selectionRange.start, selectionRange.end) * pps,
+                                left: TRACK_LABEL_WIDTH + Math.min(selectionRange.start, selectionRange.end) * pps,
                                 width: Math.abs(selectionRange.end - selectionRange.start) * pps
                             }}
                         />
@@ -776,7 +801,7 @@ export function CutTimeline({
                     {/* Global Playhead */}
                     <div
                         className="absolute top-0 bottom-0 w-[2px] bg-primary z-50 pointer-events-none transition-none"
-                        style={{ left: sequenceCurrentTime * pps }}
+                        style={{ left: TRACK_LABEL_WIDTH + sequenceCurrentTime * pps }}
                     >
                         <div className="absolute top-0 -left-[5px] size-2.5 bg-primary rotate-45 shadow-[0_0_10px_rgba(var(--primary),0.5)]" />
                     </div>

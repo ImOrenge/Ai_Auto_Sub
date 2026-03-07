@@ -56,3 +56,9 @@ dummy_input.mp4
 public/remotion-temp/
 -.mov
 
+
+# Agent Chain local config
+.tool/config.local.yaml
+
+# Agent Chain runs
+runs/

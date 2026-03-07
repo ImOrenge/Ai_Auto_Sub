@@ -5,6 +5,7 @@ import { FileVideo, CheckCircle2, Clock, XCircle, ArrowRight } from "lucide-reac
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useHasMounted } from "@/hooks/use-has-mounted";
+import { useLanguage } from "@/lib/i18n";
 
 interface RecentActivityListProps {
     jobs: JobRecord[];
@@ -12,12 +13,13 @@ interface RecentActivityListProps {
 }
 
 export function RecentActivityList({ jobs, projectId }: RecentActivityListProps) {
+    const { t } = useLanguage();
     const hasMounted = useHasMounted();
 
     if (jobs.length === 0) {
         return (
             <div className="p-8 text-center border border-dashed rounded-none bg-muted/30">
-                <p className="text-muted-foreground text-sm">No recent activity found.</p>
+                <p className="text-muted-foreground text-sm">{t("dashboard.project.activities.noActivities")}</p>
             </div>
         );
     }
@@ -25,7 +27,7 @@ export function RecentActivityList({ jobs, projectId }: RecentActivityListProps)
     return (
         <div className="space-y-4">
             <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold tracking-tight">Recent Activity</h2>
+                <h2 className="text-lg font-semibold tracking-tight">{t("dashboard.project.activities.title")}</h2>
             </div>
 
             <div className="border rounded-none bg-white dark:bg-card divide-y">
@@ -45,7 +47,7 @@ export function RecentActivityList({ jobs, projectId }: RecentActivityListProps)
 
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">
-                                {job.asset?.filename || job.url || "Untitled Job"}
+                                {job.asset?.filename || job.url || t("dashboard.project.activities.untitled")}
                             </p>
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                 <span className={cn(
@@ -64,7 +66,7 @@ export function RecentActivityList({ jobs, projectId }: RecentActivityListProps)
                                 target="_blank"
                                 className="px-3 py-1 text-xs font-medium border rounded-none hover:bg-muted transition-colors"
                             >
-                                Download SRT
+                                {t("dashboard.project.activities.downloadSrt")}
                             </Link>
                         )}
                         {job.status === "done" && job.resultVideoUrl && (
@@ -73,7 +75,7 @@ export function RecentActivityList({ jobs, projectId }: RecentActivityListProps)
                                 target="_blank"
                                 className="px-3 py-1 text-xs font-medium border rounded-none hover:bg-muted transition-colors"
                             >
-                                Download
+                                {t("dashboard.project.activities.download")}
                             </Link>
                         )}
                     </div>

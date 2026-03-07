@@ -223,13 +223,14 @@ function JobsPageContent() {
             const res = await fetch(`/api/jobs/${jobId}/export`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ format: 'mp4' })
+                body: JSON.stringify({
+                    format: 'mp4',
+                    renderer: 'canvas'
+                })
             });
             if (!res.ok) throw new Error('Export failed');
-            const data = await res.json();
-            if (data.downloadUrl) {
-                window.open(data.downloadUrl, '_blank');
-            }
+            alert('Server render started in background.');
+            await fetchJobs({ showRefresh: true });
         } catch (e) {
             alert('Failed to export job');
         } finally {

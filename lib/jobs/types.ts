@@ -45,13 +45,16 @@ export function classifySourceType(url: string): SourceType {
  * 지원 언어 목록
  */
 export const SUPPORTED_LANGUAGES = [
+  { code: 'auto', label: '자동 인식 (Auto)' },
   { code: 'ko', label: '한국어' },
   { code: 'en', label: 'English' },
   { code: 'ja', label: '日本語' },
-  { code: 'zh', label: '中文' },
-  { code: 'es', label: 'Español' },
+  { code: 'ru', label: 'Русский' },
   { code: 'fr', label: 'Français' },
+  { code: 'es', label: 'Español' },
   { code: 'de', label: 'Deutsch' },
+  { code: 'it', label: 'Italiano' },
+  { code: 'zh', label: '中文' },
   { code: 'pt', label: 'Português' },
   { code: 'vi', label: 'Tiếng Việt' },
   { code: 'th', label: 'ไทย' },
@@ -72,8 +75,8 @@ export type LanguageConfig = {
 };
 
 export const DEFAULT_LANGUAGE_CONFIG: LanguageConfig = {
-  sourceLanguage: 'ko',
-  targetLanguage: 'en',
+  sourceLanguage: 'auto',
+  targetLanguage: 'ko',
   showBilingual: false,
 };
 
@@ -164,6 +167,10 @@ export type SubtitleConfig = {
   marginV: number;
   /** 자막 효과 */
   effect?: SubtitleEffect;
+  /** 원본 언어 */
+  sourceLanguage?: LanguageCode;
+  /** 번역 대상 언어 */
+  targetLanguage?: LanguageCode;
   /** 애니메이션 설정 */
   animation?: {
     fadeIn?: number;  // ms
@@ -193,7 +200,7 @@ export type SubtitleConfig = {
   /** Remotion specific: video fit */
   videoFit?: 'contain' | 'cover';
   /** Remotion specific: aspect ratio */
-  videoAspectRatio?: 'original' | '9:16' | '1:1' | '16:9';
+  videoAspectRatio?: 'original' | '9:16' | '1:1' | '16:9' | '4:5';
 };
 
 // --- Pipeline Component Types ---
@@ -267,6 +274,8 @@ export const DEFAULT_SUBTITLE_CONFIG: SubtitleConfig = {
   strokeWidth: 0,
   strokeColor: '#000000',
   displayMode: 'standard',
+  sourceLanguage: 'auto',
+  targetLanguage: 'ko',
 };
 
 // ============================================================================
@@ -321,7 +330,7 @@ export type CaptionData = {
   /** Language configuration */
   language?: LanguageConfig;
   /** Video aspect ratio */
-  videoAspectRatio?: 'original' | '9:16' | '1:1' | '16:9';
+  videoAspectRatio?: 'original' | '9:16' | '1:1' | '16:9' | '4:5';
   /** Video fit mode */
   videoFit?: 'contain' | 'cover';
   /** Global playback speed */
@@ -454,6 +463,7 @@ export type JobRecord = {
   step: JobStep | string | null;
   progress: number;
   resultSrtUrl: string | null;
+  resultOriginalSrtUrl: string | null;
   resultVideoUrl: string | null;
   errorMessage: string | null;
   subtitleConfig: SubtitleConfig | null;
@@ -496,6 +506,7 @@ export type JobUpdateInput = {
   step?: JobStep | string | null;
   progress?: number | null;
   resultSrtUrl?: string | null;
+  resultOriginalSrtUrl?: string | null;
   resultVideoUrl?: string | null;
   errorMessage?: string | null;
   sourceType?: SourceType;

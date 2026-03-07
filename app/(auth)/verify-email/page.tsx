@@ -90,30 +90,29 @@ function VerifyEmailContent() {
     }
 
     return (
-        <div className="rounded-3xl border bg-card/80 p-6 shadow-sm lg:p-8">
-            <div className="space-y-1 text-center">
-                <div className="flex justify-center mb-4">
+        <div className="border border-foreground/10 bg-background p-6 lg:p-10 shadow-lg">
+            <div className="space-y-1 text-center mb-8">
+                <div className="flex justify-center mb-8">
                     {isSuccess ? (
                         <CheckCircle2 className="w-16 h-16 text-emerald-500" />
                     ) : (
                         <Mail className="w-16 h-16 text-primary" />
                     )}
                 </div>
-                <p className="text-sm font-semibold text-primary">이메일 인증</p>
-                <h2 className="text-2xl font-semibold tracking-tight">
-                    {isSuccess ? "인증 완료!" : "인증 코드를 입력하세요"}
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Email Verification</p>
+                <h2 className="text-2xl font-black uppercase tracking-tighter">
+                    {isSuccess ? "VERIFIED!" : "ENTER CODE"}
                 </h2>
-                <p className="text-sm text-muted-foreground pt-2">
+                <div className="pt-2">
                     {isSuccess ? (
-                        "잠시 후 프로젝트 페이지로 이동합니다..."
+                        <p className="text-[11px] text-muted-foreground uppercase opacity-70">Redirecting to projects...</p>
                     ) : (
                         <>
-                            <span className="font-medium text-foreground">{email}</span>
-                            <br />
-                            위 이메일로 전송된 6자리 인증 코드를 입력해주세요.
+                            <p className="text-[11px] text-foreground font-bold uppercase tracking-widest">{email}</p>
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">Please enter the 6-digit code sent to your email.</p>
                         </>
                     )}
-                </p>
+                </div>
             </div>
 
             {!isSuccess && (
@@ -130,9 +129,9 @@ function VerifyEmailContent() {
 
                         {message && (
                             <div
-                                className={`rounded-2xl border px-4 py-3 text-sm text-center ${message.type === "error"
-                                        ? "border-red-500/40 bg-red-500/10 text-red-500"
-                                        : "border-emerald-500/40 bg-emerald-500/10 text-emerald-600"
+                                className={`border px-4 py-3 text-[11px] font-bold uppercase tracking-tight text-center ${message.type === "error"
+                                    ? "border-destructive bg-destructive/10 text-destructive"
+                                    : "border-foreground bg-foreground/10 text-foreground"
                                     }`}
                             >
                                 {message.text}
@@ -145,15 +144,15 @@ function VerifyEmailContent() {
                             type="button"
                             onClick={() => handleVerify(otp)}
                             disabled={otp.length !== 6 || isVerifying}
-                            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="flex w-full items-center justify-center gap-2 bg-primary px-4 py-3 text-xs font-black uppercase tracking-[0.2em] text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                             {isVerifying && <Loader2 className="w-4 h-4 animate-spin" />}
-                            인증하기
+                            VERIFY NOW
                         </button>
 
                         <div className="text-center">
-                            <p className="text-sm text-muted-foreground mb-2">
-                                인증 메일을 받지 못하셨나요?
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4">
+                                Didn't receive the code?
                             </p>
                             <ResendButton onResend={handleResend} cooldownSeconds={60} disabled={isVerifying} />
                         </div>
@@ -161,10 +160,10 @@ function VerifyEmailContent() {
                 </div>
             )}
 
-            <p className="mt-6 text-center text-sm text-muted-foreground">
-                다른 이메일로 가입하셨나요?{" "}
-                <Link className="font-semibold text-primary underline-offset-4 hover:underline" href="/signup">
-                    회원가입 다시하기
+            <p className="mt-8 text-center text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+                Wrong email?{" "}
+                <Link className="text-foreground hover:underline" href="/signup">
+                    Re-signup
                 </Link>
             </p>
         </div>
@@ -175,8 +174,8 @@ export default function VerifyEmailPage() {
     return (
         <Suspense
             fallback={
-                <div className="flex items-center justify-center min-h-[400px]">
-                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                <div className="flex items-center justify-center min-h-[400px] border border-foreground/10 bg-background">
+                    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
                 </div>
             }
         >

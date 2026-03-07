@@ -162,6 +162,48 @@
   }
 }
 
+/* Language Specific Adjustments */
+html {
+  /* Default behaviors */
+  transition: font-size 0.2s ease-in-out;
+}
+
+html[lang="en"] {
+  /* Slightly increased from 15px to 15.5px to achieve better visual parity with Korean scale */
+  font-size: 15.5px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+
+  --tracking-widest: 0.14em;
+  --tracking-wider: 0.06em;
+  --tracking-tight: -0.005em;
+}
+
+html[lang="ko"] {
+  /* Korean is denser and more square; regular 16px scale works best */
+  font-size: 16px;
+  line-height: 1.6;
+
+  --tracking-widest: 0.2em;
+  --tracking-wider: 0.08em;
+  --tracking-tight: 0em;
+}
+
+.tracking-widest {
+  letter-spacing: var(--tracking-widest, 0.25em);
+}
+
+.tracking-wider {
+  letter-spacing: var(--tracking-wider, 0.1em);
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans), "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+}
+
 @layer utilities {
   .perspective-1200 {
     perspective: 1200px;

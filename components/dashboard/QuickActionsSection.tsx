@@ -3,15 +3,18 @@
 import { AlertCircle, Film, FileVideo, Users, Settings, Plus } from "lucide-react";
 import Link from "next/link";
 import { routes } from "@/lib/routes";
+import { useLanguage } from "@/lib/i18n";
 
 interface QuickActionsSectionProps {
     onCreateProject: () => void;
 }
 
 export function QuickActionsSection({ onCreateProject }: QuickActionsSectionProps) {
+    const { t } = useLanguage();
+
     return (
         <section className="space-y-4">
-            <h2 className="text-xl font-semibold tracking-tight">Quick Actions</h2>
+            <h2 className="text-xl font-semibold tracking-tight">{t("dashboard.quickActions.title")}</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <button
                     onClick={onCreateProject}
@@ -20,7 +23,7 @@ export function QuickActionsSection({ onCreateProject }: QuickActionsSectionProp
                     <div className="p-3 rounded-full bg-primary/10 text-primary group-hover:scale-110 transition-transform">
                         <Plus className="size-6" />
                     </div>
-                    <span className="font-medium">New Project</span>
+                    <span className="font-medium">{t("dashboard.quickActions.newProject")}</span>
                 </button>
 
                 <Link
@@ -30,7 +33,7 @@ export function QuickActionsSection({ onCreateProject }: QuickActionsSectionProp
                     <div className="p-3 rounded-full bg-emerald-500/10 text-emerald-600 group-hover:scale-110 transition-transform">
                         <AlertCircle className="size-6" />
                     </div>
-                    <span className="font-medium">Check Usage</span>
+                    <span className="font-medium">{t("dashboard.quickActions.checkUsage") || "Check Usage"}</span>
                 </Link>
 
                 <Link
@@ -40,7 +43,7 @@ export function QuickActionsSection({ onCreateProject }: QuickActionsSectionProp
                     <div className="p-3 rounded-full bg-purple-500/10 text-purple-600 group-hover:scale-110 transition-transform">
                         <Settings className="size-6" />
                     </div>
-                    <span className="font-medium">Manage Plan</span>
+                    <span className="font-medium">{t("dashboard.quickActions.managePlan") || "Manage Plan"}</span>
                 </Link>
 
                 <Link
@@ -51,7 +54,7 @@ export function QuickActionsSection({ onCreateProject }: QuickActionsSectionProp
                     <div className="p-3 rounded-full bg-orange-500/10 text-orange-600 group-hover:scale-110 transition-transform">
                         <FileVideo className="size-6" />
                     </div>
-                    <span className="font-medium">Tutorials</span>
+                    <span className="font-medium">{t("dashboard.quickActions.tutorials") || "Tutorials"}</span>
                 </Link>
             </div>
         </section>

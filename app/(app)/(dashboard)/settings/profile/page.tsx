@@ -5,6 +5,7 @@ import { Save, Check, User, Mail, Calendar, Hash, BadgeCheck, Loader2, Clock, Ac
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/lib/i18n";
 
 type UserProfile = {
     user: {
@@ -22,6 +23,7 @@ type UserProfile = {
 };
 
 export default function ProfilePage() {
+    const { t } = useLanguage();
     const router = useRouter();
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
@@ -85,9 +87,9 @@ export default function ProfilePage() {
     return (
         <div className="space-y-8">
             <div className="flex flex-col gap-1">
-                <h2 className="text-xl font-bold tracking-tight">Profile Information</h2>
+                <h2 className="text-xl font-bold tracking-tight">{t("dashboard.profile.title")}</h2>
                 <p className="text-sm text-muted-foreground">
-                    Manage your personal information and account details.
+                    {t("dashboard.profile.subtitle")}
                 </p>
             </div>
 
@@ -97,7 +99,7 @@ export default function ProfilePage() {
                     <div className="space-y-4">
                         <div className="space-y-2">
                             <label className="text-sm font-semibold" htmlFor="name">
-                                Full Name
+                                {t("dashboard.profile.name")}
                             </label>
                             <div className="relative">
                                 <User className="absolute left-3 top-3 size-4 text-muted-foreground" />
@@ -107,7 +109,7 @@ export default function ProfilePage() {
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
                                     className="w-full rounded-xl border border-border bg-background pl-10 pr-4 py-2.5 text-sm outline-none ring-primary/20 transition focus:ring-2"
-                                    placeholder="Your Name"
+                                    placeholder={t("dashboard.profile.namePlaceholder")}
                                 />
                             </div>
                         </div>
@@ -125,11 +127,11 @@ export default function ProfilePage() {
                                     value={profile?.user.email || ""}
                                 />
                             </div>
-                            <p className="text-[10px] text-muted-foreground">Email cannot be changed.</p>
+                            <p className="text-[10px] text-muted-foreground">{t("dashboard.profile.emailNote")}</p>
                         </div>
                         <div className="space-y-2">
                             <label className="text-sm font-semibold" htmlFor="company">
-                                Company/Team
+                                {t("dashboard.profile.company")}
                             </label>
                             <input
                                 id="company"
@@ -137,7 +139,7 @@ export default function ProfilePage() {
                                 value={company}
                                 onChange={(e) => setCompany(e.target.value)}
                                 className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none ring-primary/20 transition focus:ring-2"
-                                placeholder="(Optional)"
+                                placeholder={t("dashboard.profile.companyPlaceholder")}
                             />
                         </div>
                     </div>
@@ -156,12 +158,12 @@ export default function ProfilePage() {
                             {saved ? (
                                 <>
                                     <Check className="size-4" />
-                                    Saved
+                                    {t("dashboard.profile.saved")}
                                 </>
                             ) : (
                                 <>
                                     <Save className="size-4" />
-                                    Save Changes
+                                    {t("dashboard.profile.save")}
                                 </>
                             )}
                         </button>
@@ -173,7 +175,7 @@ export default function ProfilePage() {
                     <div className="rounded-2xl border bg-secondary/20 p-6 space-y-6">
                         <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                             <BadgeCheck className="size-4 text-primary" />
-                            Account Overview
+                            {t("dashboard.profile.overview")}
                         </h3>
 
                         <div className="grid gap-4">
@@ -183,7 +185,7 @@ export default function ProfilePage() {
                                         <BadgeCheck className="size-4" />
                                     </div>
                                     <div className="flex flex-col">
-                                        <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-tighter">Current Plan</span>
+                                        <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-tighter">{t("dashboard.profile.plan")}</span>
                                         <span className="text-sm font-bold">{profile?.subscription.plan}</span>
                                     </div>
                                 </div>
@@ -197,7 +199,7 @@ export default function ProfilePage() {
                                     <Calendar className="size-4" />
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-tighter">Joined At</span>
+                                    <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-tighter">{t("dashboard.profile.joined")}</span>
                                     <span className="text-sm font-bold">
                                         {profile?.user.created_at ? format(new Date(profile.user.created_at), "PPP") : "-"}
                                     </span>
@@ -210,7 +212,7 @@ export default function ProfilePage() {
                                     <Activity className="size-4" />
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-tighter">Last Activity</span>
+                                    <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-tighter">{t("dashboard.profile.lastActivity")}</span>
                                     <span className="text-sm font-bold">
                                         {profile?.user.last_sign_in_at ? format(new Date(profile.user.last_sign_in_at), "MMM d, HH:mm") : "-"}
                                     </span>
@@ -222,7 +224,7 @@ export default function ProfilePage() {
                                     <Hash className="size-4" />
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-tighter">User ID</span>
+                                    <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-tighter">{t("dashboard.profile.userId")}</span>
                                     <span className="text-[10px] font-mono font-medium text-muted-foreground truncate max-w-[180px]">
                                         {profile?.user.id}
                                     </span>
@@ -232,8 +234,7 @@ export default function ProfilePage() {
 
                         <div className="p-4 rounded-xl bg-primary/5 border border-primary/10">
                             <p className="text-xs text-muted-foreground leading-relaxed">
-                                Your account was created using {profile?.user.email}.
-                                If you need to migrate your data or change your login provider, please contact support.
+                                {t("dashboard.profile.migrationNote").replace("{email}", profile?.user.email || "")}
                             </p>
                         </div>
                     </div>
@@ -244,10 +245,10 @@ export default function ProfilePage() {
             <div className="mt-8 rounded-2xl border border-red-500/30 bg-red-500/5 p-6 space-y-4">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-red-500 flex items-center gap-2">
                     <AlertTriangle className="size-4" />
-                    Danger Zone
+                    {t("dashboard.profile.dangerZone")}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                    Once you delete your account, there is no going back. All your data, projects, and exports will be permanently removed.
+                    {t("dashboard.profile.deleteDesc")}
                 </p>
                 {deleteError && (
                     <p className="text-sm text-red-500 bg-red-500/10 p-2 rounded-lg">{deleteError}</p>
@@ -259,7 +260,7 @@ export default function ProfilePage() {
                         className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold text-red-500 border border-red-500/30 hover:bg-red-500/10 transition"
                     >
                         <Trash2 className="size-4" />
-                        Delete Account
+                        {t("dashboard.profile.deleteCta")}
                     </button>
                 ) : (
                     <div className="flex flex-col gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/30">
@@ -278,7 +279,7 @@ export default function ProfilePage() {
                                 ) : (
                                     <Trash2 className="size-4" />
                                 )}
-                                Yes, Delete My Account
+                                {t("dashboard.profile.confirmDeleteCta")}
                             </button>
                             <button
                                 type="button"
@@ -286,7 +287,7 @@ export default function ProfilePage() {
                                 disabled={deleteLoading}
                                 className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold border border-border hover:bg-secondary transition"
                             >
-                                Cancel
+                                {t("dashboard.profile.cancel")}
                             </button>
                         </div>
                     </div>

@@ -1,0 +1,28 @@
+project_root_markers:
+- .git
+- Cargo.toml
+- package.json
+- pyproject.toml
+- go.mod
+instruction_files:
+  shared: AGENTS.md
+  local: AGENTS.local.md
+  skills: skills.md
+instruction_max_bytes: 65536
+workflow:
+  phases:
+  - reasoning
+  - plan
+  - execute
+  - verify
+  - debug
+  max_steps: 24
+  parallel_workers: 3
+  debug_max_attempts: 2
+model:
+  provider: google
+  name: gemini-2.0-flash
+  temperature: 0.2
+store:
+  runs_dir: runs
+  format: jsonl

@@ -11,6 +11,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "render:local": "tsx scripts/local-render-agent.ts",
+    "render:daemon": "tsx scripts/local-render-daemon.ts",
     "test:e2e": "tsx scripts/e2e-media.ts",
     "test:e2e:ui": "playwright test"
   },
@@ -40,7 +42,6 @@
     "framer-motion": "^12.29.2",
     "jassub": "^2.3.3",
     "lucide-react": "^0.563.0",
-    "mp4box": "^2.3.0",
     "next": "^16.0.10",
     "openai": "^4.75.2",
     "pixi.js": "^8.15.0",

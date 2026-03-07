@@ -6,11 +6,13 @@ import { cn } from "@/lib/utils";
 import { buildDashboardNav, routes } from "@/lib/routes";
 import { LayoutDashboard, Folder, LineChart, Code, Settings } from "lucide-react";
 import { useSidebar } from "../SidebarContext";
+import { useLanguage } from "@/lib/i18n";
 
 export function DashboardSidebar() {
     const pathname = usePathname();
     const navItems = buildDashboardNav();
     const { isCollapsed } = useSidebar();
+    const { t } = useLanguage();
 
     const icons = {
         dashboard: LayoutDashboard,
@@ -34,7 +36,7 @@ export function DashboardSidebar() {
                     <span className="text-[10px] font-bold text-primary">WS</span>
                 ) : (
                     <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                        Global Workspace
+                        {t("common.workspace")}
                     </span>
                 )}
             </div>
@@ -56,10 +58,10 @@ export function DashboardSidebar() {
                                         ? "bg-sidebar-accent text-sidebar-accent-foreground"
                                         : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
                                 )}
-                                title={isCollapsed ? item.label : undefined}
+                                title={isCollapsed ? t(`common.nav.${item.key}`) : undefined}
                             >
                                 <Icon className="size-5 shrink-0" aria-hidden="true" />
-                                {!isCollapsed && <span>{item.label}</span>}
+                                {!isCollapsed && <span>{t(`common.nav.${item.key}`)}</span>}
                             </Link>
                         );
                     })}
@@ -74,10 +76,10 @@ export function DashboardSidebar() {
                             isCollapsed ? "px-2 justify-center" : "px-3",
                             pathname.startsWith("/settings") && "bg-sidebar-accent text-sidebar-accent-foreground"
                         )}
-                        title={isCollapsed ? "Settings" : undefined}
+                        title={isCollapsed ? t("common.settings") : undefined}
                     >
                         <Settings className="size-5 shrink-0" aria-hidden="true" />
-                        {!isCollapsed && <span>Settings</span>}
+                        {!isCollapsed && <span>{t("common.settings")}</span>}
                     </Link>
                 </div>
             </div>

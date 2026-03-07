@@ -1,6 +1,8 @@
 "use client";
 
 import { Clock, Film, FileText, CheckCircle2 } from "lucide-react";
+import { useLanguage } from "@/lib/i18n";
+import { useHasMounted } from "@/hooks/use-has-mounted";
 
 interface ProjectStatsProps {
     totalAssets: number;
@@ -10,6 +12,8 @@ interface ProjectStatsProps {
 }
 
 export function ProjectStatsOverview({ totalAssets, totalJobs, completedJobs, lastUpdated }: ProjectStatsProps) {
+    const { t } = useLanguage();
+    const hasMounted = useHasMounted();
     return (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="p-4 bg-white dark:bg-card border rounded-none">
@@ -18,7 +22,7 @@ export function ProjectStatsOverview({ totalAssets, totalJobs, completedJobs, la
                         <Film className="size-5" />
                     </div>
                     <div>
-                        <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Total Project Assets</p>
+                        <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">{t("dashboard.project.overview.stats.assets")}</p>
                         <p className="text-2xl font-bold">{totalAssets}</p>
                     </div>
                 </div>
@@ -30,7 +34,7 @@ export function ProjectStatsOverview({ totalAssets, totalJobs, completedJobs, la
                         <FileText className="size-5" />
                     </div>
                     <div>
-                        <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Total Jobs</p>
+                        <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">{t("dashboard.project.overview.stats.jobs")}</p>
                         <p className="text-2xl font-bold">{totalJobs}</p>
                     </div>
                 </div>
@@ -42,7 +46,7 @@ export function ProjectStatsOverview({ totalAssets, totalJobs, completedJobs, la
                         <CheckCircle2 className="size-5" />
                     </div>
                     <div>
-                        <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Completed Exports</p>
+                        <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">{t("dashboard.project.overview.stats.completed")}</p>
                         <p className="text-2xl font-bold">{completedJobs}</p>
                     </div>
                 </div>
@@ -54,8 +58,8 @@ export function ProjectStatsOverview({ totalAssets, totalJobs, completedJobs, la
                         <Clock className="size-5" />
                     </div>
                     <div>
-                        <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Last Updated</p>
-                        <p className="text-sm font-semibold">{new Date(lastUpdated).toLocaleDateString()}</p>
+                        <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">{t("dashboard.project.overview.stats.updated")}</p>
+                        <p className="text-sm font-semibold">{hasMounted ? new Date(lastUpdated).toLocaleDateString() : ""}</p>
                     </div>
                 </div>
             </div>

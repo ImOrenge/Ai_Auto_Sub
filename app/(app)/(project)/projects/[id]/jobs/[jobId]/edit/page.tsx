@@ -114,23 +114,17 @@ function EditorClient({ projectId, jobId }: { projectId: string; jobId: string }
             const res = await fetch(`/api/jobs/${jobId}/export`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ format: "mp4" }),
+                body: JSON.stringify({
+                    format: "mp4",
+                    renderer: "canvas",
+                }),
             });
 
             if (!res.ok) throw new Error("Export failed");
-            const { downloadUrl } = await res.json();
-
-            // Create hidden link and trigger download
-            const link = document.createElement("a");
-            link.href = downloadUrl;
-            link.download = `${job.asset?.filename || "video"}.mp4`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
 
             toast({
-                title: "내보내기 완료",
-                description: "영상이 성공적으로 생성되었습니다.",
+                title: "Export started",
+                description: "Server render is running in the background.",
             });
         } catch (error) {
             toast({

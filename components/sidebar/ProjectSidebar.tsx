@@ -15,8 +15,10 @@ import {
     History
 } from "lucide-react";
 import { useSidebar } from "../SidebarContext";
+import { useLanguage } from "@/lib/i18n";
 
 export function ProjectSidebar({ projectId }: { projectId: string }) {
+    const { t } = useLanguage();
     const pathname = usePathname();
     const navItems = buildProjectNav(projectId);
     const { isCollapsed } = useSidebar();
@@ -48,8 +50,8 @@ export function ProjectSidebar({ projectId }: { projectId: string }) {
                 </Link>
                 {!isCollapsed && (
                     <div className="flex flex-col min-w-0">
-                        <span className="text-xs font-bold truncate">Project Admin</span>
-                        <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-tight">Main Console</span>
+                        <span className="text-xs font-bold truncate">{t("dashboard.project.sidebar.admin")}</span>
+                        <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-tight">{t("dashboard.project.sidebar.mainConsole")}</span>
                     </div>
                 )}
             </div>
@@ -72,10 +74,10 @@ export function ProjectSidebar({ projectId }: { projectId: string }) {
                                         ? "bg-sidebar-accent text-sidebar-accent-foreground"
                                         : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
                                 )}
-                                title={isCollapsed ? item.label : undefined}
+                                title={isCollapsed ? t(`common.nav.${item.key}`) : undefined}
                             >
                                 <Icon className="size-5 shrink-0" aria-hidden="true" />
-                                {!isCollapsed && <span>{item.label}</span>}
+                                {!isCollapsed && <span>{t(`common.nav.${item.key}`)}</span>}
                             </Link>
                         );
                     })}
@@ -90,10 +92,10 @@ export function ProjectSidebar({ projectId }: { projectId: string }) {
                             isCollapsed ? "px-2 justify-center" : "px-3",
                             pathname.includes("/settings") && "bg-sidebar-accent text-sidebar-accent-foreground"
                         )}
-                        title={isCollapsed ? "Settings" : undefined}
+                        title={isCollapsed ? t("dashboard.project.sidebar.settings") : undefined}
                     >
                         <Settings className="size-5 shrink-0" aria-hidden="true" />
-                        {!isCollapsed && <span>Settings</span>}
+                        {!isCollapsed && <span>{t("dashboard.project.sidebar.settings")}</span>}
                     </Link>
                 </div>
             </div>

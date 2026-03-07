@@ -1,5 +1,6 @@
+"use client";
 
-
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
     CreditCard,
@@ -11,53 +12,77 @@ import {
     Receipt,
     Check,
     AlertCircle,
+    Loader2
 } from "lucide-react";
 import { CheckoutButton } from "@/components/billing/CheckoutButton";
 import { pricingPlans } from "@/lib/pricing";
-import { cn, MOCK_USER_ID } from "@/lib/utils";
-import { BillingService } from "@/lib/billing/service";
-// Note: BillingService is server-side friendly. If this is a client component, 
-// we normally should fetch via API or use Server Components. 
-// However, the original file was "export default async function" which implies Server Component.
-// Nested layouts supports Server Pages. So we can keep it async and server-side logic!
-// EXCEPT, I noticed I changed UsagePage to "use client" (it was client before).
-// This file has "export default async function". So it's a Server Component.
-// BUT, my Layout is "use client"?? No, layout.tsx I wrote IS "use client" because of usePathname.
-// Nested layouts: A Server Component Page CAN form the children of a Client Component Layout.
-// So I can keep this as a Server Component. 
-// Wait, the previous file had "use client" removed? No, I added "use client" to UsagePage.
-// This BillingPage does NOT have "use client" at top. It is a Server Component.
-// So I should NOT add "use client" here.
+import { cn } from "@/lib/utils";
+import { useLanguage } from "@/lib/i18n";
 
-// Wait, looking at the file content I read:
-// It imports BillingService which likely uses DB directly.
-// So yes, it is a Server Component. 
+type BillingData = {
+    subscription: any;
+    entitlements: any;
+    invoices: any[];
+};
 
-const currencyFormatter = new Intl.NumberFormat("ko-KR");
-const formatPrice = (value: number | null) =>
-    value === null ? "별도 문의" : `₩${currencyFormatter.format(value)}`;
+export default function BillingPage() {
+    const { t, language } = useLanguage();
+    const [data, setData] = useState<BillingData | null>(null);
+    const [loading, setLoading] = useState(true);
 
-const formatDate = (date: Date) =>
-    new Intl.DateTimeFormat("ko-KR", { year: 'numeric', month: 'long', day: 'numeric' }).format(date);
+    useEffect(() => {
+        fetchBillingData();
+    }, []);
 
-export default async function BillingPage() {
-    // Fetch data server-side
-    // TODO: Get actual logged in user ID
-    const userId = MOCK_USER_ID;
+    const fetchBillingData = async () => {
+        try {
+            setLoading(true);
+            const res = await fetch("/api/internal/billing-data");
+            const billingData = await res.json();
+            setData(billingData);
+        } catch (error) {
+            console.error("Failed to fetch billing data", error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
-    const [subscription, entitlements, invoices] = await Promise.all([
-        BillingService.getSubscription(userId),
-        BillingService.getEntitlements(userId),
-        BillingService.getInvoices(userId),
-    ]);
+    const currencyFormatter = new Intl.NumberFormat(language === "ko" ? "ko-KR" : "en-US", {
+        style: "currency",
+        currency: language === "ko" ? "KRW" : "USD",
+        maximumFractionDigits: 0
+    });
 
+    const formatPrice = (value: number | null) => {
+        if (value === null) return language === "ko" ? "별도 문의" : "Contact Us";
+        return currencyFormatter.format(value);
+    };
+
+    const formatDate = (date: string | Date) =>
+        new Intl.DateTimeFormat(language === "ko" ? "ko-KR" : "en-US", {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        }).format(new Date(date));
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <Loader2 className="size-8 animate-spin text-primary/50" />
+            </div>
+        );
+    }
+
+    if (!data) return null;
+
+    const { subscription, entitlements, invoices } = data;
     const usagePercentage = Math.min(100, ((entitlements?.credits?.used || 0) / (entitlements?.credits?.total || 1)) * 100);
 
     return (
         <div className="space-y-8">
             <div>
-                <h2 className="text-lg font-semibold">Plans & Billing</h2>
-                <p className="text-sm text-muted-foreground">Manage your subscription plan and billing history.</p>
+                <h2 className="text-xl font-bold tracking-tight">{t("dashboard.billing.title")}</h2>
+                <p className="text-sm text-muted-foreground">{t("dashboard.billing.subtitle")}</p>
             </div>
 
             {/* Current Plan Card */}
@@ -65,11 +90,11 @@ export default async function BillingPage() {
                 <article className="rounded-2xl border bg-card/80 p-6 shadow-sm lg:col-span-2">
                     <div className="flex items-start justify-between">
                         <div>
-                            <p className="text-xs uppercase text-muted-foreground">Current Plan</p>
-                            <h2 className="mt-1 text-2xl font-semibold">{entitlements.planName}</h2>
+                            <p className="text-xs uppercase text-muted-foreground font-bold tracking-wider">{t("dashboard.billing.currentPlan")}</p>
+                            <h2 className="mt-1 text-2xl font-bold">{entitlements.planName}</h2>
                         </div>
                         <span className={cn(
-                            "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium",
+                            "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider",
                             subscription.status === "active"
                                 ? "bg-emerald-500/10 text-emerald-500"
                                 : "bg-red-500/10 text-red-500"
@@ -77,7 +102,7 @@ export default async function BillingPage() {
                             {subscription.status === "active" ? (
                                 <>
                                     <CheckCircle2 className="size-3" />
-                                    Active
+                                    {t("dashboard.billing.active")}
                                 </>
                             ) : (
                                 <>
@@ -91,15 +116,15 @@ export default async function BillingPage() {
                     {/* Usage */}
                     <div className="mt-6">
                         <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Usage (STT)</span>
-                            <span className="font-medium">
+                            <span className="text-muted-foreground font-medium">{t("dashboard.billing.usage")}</span>
+                            <span className="font-bold">
                                 {entitlements?.credits?.used || 0} / {entitlements?.credits?.total || 0} mins
                             </span>
                         </div>
-                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary">
+                        <div className="mt-2 h-2 overflow-hidden rounded-none bg-secondary">
                             <div
                                 className={cn(
-                                    "h-full rounded-full transition-all",
+                                    "h-full rounded-none transition-all",
                                     entitlements?.credits?.isOverLimit ? "bg-red-500" : "bg-primary"
                                 )}
                                 style={{ width: `${usagePercentage}%` }}
@@ -107,7 +132,7 @@ export default async function BillingPage() {
                         </div>
                         {entitlements?.credits?.isOverLimit && (
                             <p className="mt-2 text-xs text-red-500 font-medium">
-                                Limit exceeded. Overage will be charged next cycle.
+                                {t("dashboard.billing.usageNote")}
                             </p>
                         )}
                     </div>
@@ -115,25 +140,24 @@ export default async function BillingPage() {
                     <div className="mt-6 flex flex-wrap gap-4 text-sm">
                         <div className="flex items-center gap-2 text-muted-foreground">
                             <Calendar className="size-4" />
-                            Renews: {formatDate(subscription.currentPeriodEnd)}
+                            {t("dashboard.billing.renews").replace("{date}", formatDate(subscription.currentPeriodEnd))}
                         </div>
                         <div className="flex items-center gap-2 text-muted-foreground">
                             <CreditCard className="size-4" />
-                            Cycle: {subscription.cycle === "monthly" ? "Monthly" : "Yearly"}
+                            {t("dashboard.billing.cycle").replace("{cycle}", subscription.cycle === "monthly" ? (language === "ko" ? "월간" : "Monthly") : (language === "ko" ? "연간" : "Yearly"))}
                         </div>
                     </div>
 
                     <div className="mt-6 flex flex-wrap gap-3">
-                        <button disabled className="inline-flex items-center gap-2 rounded-full border border-border px-5 py-2 text-sm font-semibold transition hover:bg-secondary">
-                            Manage Payment Method
+                        <button disabled className="inline-flex items-center gap-2 rounded-none border border-border px-5 py-2.5 text-sm font-bold transition hover:bg-secondary disabled:opacity-50">
+                            {t("dashboard.billing.managePayment")}
                         </button>
-                        {/* Dummy Link to Plans */}
                         <Link
                             href="#plans"
-                            className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+                            className="inline-flex items-center gap-2 rounded-none bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90 active:scale-95"
                         >
                             <Zap className="size-4" />
-                            Change Plan
+                            {t("dashboard.billing.changePlan")}
                         </Link>
                     </div>
                 </article>
@@ -146,8 +170,8 @@ export default async function BillingPage() {
                                 <TrendingUp className="size-5 text-primary" />
                             </div>
                             <div>
-                                <p className="text-xs text-muted-foreground">Remaining</p>
-                                <p className="text-xl font-semibold">{entitlements?.credits?.remaining || 0}m</p>
+                                <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider">{t("dashboard.billing.remaining")}</p>
+                                <p className="text-xl font-bold">{entitlements?.credits?.remaining || 0}m</p>
                             </div>
                         </div>
                     </article>
@@ -157,9 +181,8 @@ export default async function BillingPage() {
                                 <Receipt className="size-5 text-primary" />
                             </div>
                             <div>
-                                <p className="text-xs text-muted-foreground">Est. Total</p>
-                                {/* Mock calculated value, in real app BillingService.getUpcomingInvoice() */}
-                                <p className="text-xl font-semibold">{formatPrice(0)}</p>
+                                <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider">{t("dashboard.billing.estTotal")}</p>
+                                <p className="text-xl font-bold">{formatPrice(0)}</p>
                             </div>
                         </div>
                     </article>
@@ -168,7 +191,7 @@ export default async function BillingPage() {
 
             {/* Available Plans */}
             <section id="plans" className="space-y-6">
-                <h2 className="text-lg font-semibold">Available Plans</h2>
+                <h2 className="text-xl font-bold tracking-tight">{t("dashboard.billing.availablePlans")}</h2>
                 <div className="grid gap-6 lg:grid-cols-3">
                     {pricingPlans.map((plan) => (
                         <article
@@ -181,11 +204,11 @@ export default async function BillingPage() {
                         >
                             <div className="flex items-center justify-between gap-3">
                                 <div>
-                                    <h3 className="text-xl font-semibold">{plan.name}</h3>
-                                    {plan.badge && <p className="text-xs font-medium text-primary mt-1">{plan.badge}</p>}
+                                    <h3 className="text-xl font-bold">{plan.name}</h3>
+                                    {plan.badge && <p className="text-xs font-bold text-primary mt-1 uppercase tracking-wider">{plan.badge}</p>}
                                 </div>
                                 {plan.id === subscription.planId && (
-                                    <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-500">
+                                    <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-xs font-bold text-emerald-500 uppercase tracking-wider">
                                         Current
                                     </span>
                                 )}
@@ -193,14 +216,14 @@ export default async function BillingPage() {
                             <div className="mt-4 flex items-baseline gap-1">
                                 {plan.priceMonthly !== null ? (
                                     <>
-                                        <span className="text-3xl font-semibold">{formatPrice(plan.priceMonthly)}</span>
-                                        <span className="text-sm text-muted-foreground">/mo</span>
+                                        <span className="text-3xl font-bold">{formatPrice(plan.priceMonthly)}</span>
+                                        <span className="text-sm text-muted-foreground font-medium">/mo</span>
                                     </>
                                 ) : (
-                                    <span className="text-2xl font-semibold">Contact Us</span>
+                                    <span className="text-2xl font-bold">{language === "ko" ? "별도 문의" : "Contact Us"}</span>
                                 )}
                             </div>
-                            <div className="mt-2 text-sm font-medium text-secondary-foreground">
+                            <div className="mt-2 text-sm font-bold text-secondary-foreground">
                                 {plan.quota}
                             </div>
 
@@ -208,7 +231,7 @@ export default async function BillingPage() {
                                 {plan.features.slice(0, 5).map((feature, idx) => (
                                     <li key={idx} className="flex items-center gap-2">
                                         <Check className="size-4 text-primary" />
-                                        {feature.text} {feature.value && <span className="font-semibold text-foreground"> {feature.value}</span>}
+                                        {feature.text} {feature.value && <span className="font-bold text-foreground"> {feature.value}</span>}
                                     </li>
                                 ))}
                                 {plan.features.length > 5 && (
@@ -219,13 +242,13 @@ export default async function BillingPage() {
                                 planId={plan.id}
                                 isCurrent={plan.id === subscription.planId}
                                 className={cn(
-                                    "mt-6 inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition w-full h-10",
+                                    "mt-6 inline-flex items-center justify-center gap-2 rounded-none px-4 py-2.5 text-sm font-bold transition w-full h-11",
                                     plan.id === subscription.planId
                                         ? "border border-border text-muted-foreground cursor-not-allowed"
                                         : "bg-primary text-primary-foreground hover:opacity-90 active:scale-95"
                                 )}
                             >
-                                {plan.id === subscription.planId ? "Current Plan" : (plan.id === 'free' ? 'Downgrade' : 'Upgrade')}
+                                {plan.id === subscription.planId ? (language === "ko" ? "현재 플랜" : "Current Plan") : (plan.id === 'free' ? (language === "ko" ? "다운그레이드" : "Downgrade") : (language === "ko" ? "업그레이드" : "Upgrade"))}
                                 {plan.id !== subscription.planId && <ArrowRight className="size-4" />}
                             </CheckoutButton>
                         </article>
@@ -234,38 +257,38 @@ export default async function BillingPage() {
             </section>
 
             {/* Billing History */}
-            <section className="rounded-2xl border bg-card/70 shadow-sm">
-                <div className="border-b p-5">
-                    <h2 className="text-lg font-semibold">Billing History</h2>
+            <section className="rounded-2xl border bg-card/70 shadow-sm overflow-hidden">
+                <div className="border-b p-5 bg-secondary/20">
+                    <h2 className="text-lg font-bold tracking-tight">{t("dashboard.billing.history")}</h2>
                 </div>
                 <div className="divide-y">
                     {invoices.length === 0 ? (
                         <div className="p-8 text-center text-sm text-muted-foreground">
-                            No billing history available.
+                            {t("dashboard.billing.noHistory")}
                         </div>
                     ) : (
                         invoices.map((invoice) => (
                             <div
                                 key={invoice.id}
-                                className="flex items-center justify-between p-5"
+                                className="flex items-center justify-between p-5 hover:bg-secondary/10 transition-colors"
                             >
                                 <div className="flex items-center gap-4">
                                     <div className="rounded-lg bg-secondary p-2">
                                         <Receipt className="size-5 text-muted-foreground" />
                                     </div>
                                     <div>
-                                        <p className="font-medium">
+                                        <p className="font-bold">
                                             {invoice.lineItems[0]?.description || "Service Fee"}
                                         </p>
-                                        <p className="text-xs text-muted-foreground">
+                                        <p className="text-xs text-muted-foreground font-medium">
                                             {formatDate(invoice.created)}
                                         </p>
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                    <p className="font-semibold">{formatPrice(invoice.amountTotal)}</p>
-                                    <p className={cn("text-xs", invoice.status === "paid" ? "text-emerald-500" : "text-muted-foreground")}>
-                                        {invoice.status === "paid" ? "Paid" : invoice.status}
+                                    <p className="font-bold text-lg">{formatPrice(invoice.amountTotal)}</p>
+                                    <p className={cn("text-xs font-bold uppercase tracking-wider", invoice.status === "paid" ? "text-emerald-500" : "text-muted-foreground")}>
+                                        {invoice.status === "paid" ? (language === "ko" ? "결제 완료" : "Paid") : invoice.status}
                                     </p>
                                 </div>
                             </div>

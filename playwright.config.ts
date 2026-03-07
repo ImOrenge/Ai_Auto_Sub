@@ -33,5 +33,18 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
     },
+    {
+      name: "firefox",
+      use: { ...devices["Desktop Firefox"] },
+    },
+    {
+      name: "zen",
+      use: {
+        ...devices["Desktop Firefox"],
+        launchOptions: {
+          executablePath: "C:\\Program Files\\Zen Browser\\zen.exe",
+        },
+      },
+    },
   ],
 });

@@ -12,6 +12,8 @@ type SubtitleOverlayProps = {
     onClick?: () => void;
 };
 
+const isTimeWithinWord = (time: number, start: number, end: number) => time >= start && time < end;
+
 
 
 export function SubtitleOverlay({
@@ -80,7 +82,7 @@ export function SubtitleOverlay({
         if (!cue.words || cue.words.length === 0) {
             return Math.floor(progress * words.length);
         }
-        return cue.words.findIndex(w => currentTime >= w.start && currentTime <= w.end);
+        return cue.words.findIndex(w => isTimeWithinWord(currentTime, w.start, w.end));
     }, [cue.words, currentTime, progress, words.length]);
 
     // -------------------------------------------------------------------------

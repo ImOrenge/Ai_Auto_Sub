@@ -114,34 +114,38 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="rounded-3xl border bg-card/80 p-6 shadow-sm lg:p-8">
-      <div className="space-y-1 text-center">
-        <p className="text-sm font-semibold text-primary">새 계정 만들기</p>
-        <h2 className="text-2xl font-semibold tracking-tight">3분 만에 AutoSubAI 시작</h2>
-        <p className="text-sm text-muted-foreground">
-          이메일 인증만 완료하면 바로 번역, 자막 생성, 자막 삽입 영상 만들기를 체험할 수 있습니다.
+    <div className="border border-foreground/10 bg-background p-6 lg:p-10 shadow-lg">
+      <div className="space-y-1 text-center mb-8">
+        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">New Account</p>
+        <h2 className="text-2xl font-black uppercase tracking-tighter">Start AutoSubAI</h2>
+        <p className="text-[11px] text-muted-foreground uppercase opacity-70">
+          Try translation and caption generation in 3 minutes.
         </p>
       </div>
       <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-        <label className="space-y-2 text-sm font-medium text-foreground">
-          이메일 주소
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block">
+            Email Address
+          </label>
           <input
-            className="w-full rounded-2xl border border-border bg-background/70 px-4 py-3 text-sm outline-none ring-primary/20 transition focus:ring-2"
+            className="w-full border border-foreground/10 bg-background px-4 py-3 text-sm outline-none transition focus:border-foreground"
             type="email"
             autoComplete="email"
             placeholder="studio@example.com"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
           />
-        </label>
-        <label className="space-y-2 text-sm font-medium text-foreground">
-          비밀번호
-          <div className="flex items-center rounded-2xl border border-border bg-background/70 px-4">
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block">
+            Password
+          </label>
+          <div className="flex items-center border border-foreground/10 bg-background px-4">
             <input
               className="w-full bg-transparent py-3 text-sm outline-none"
               type={showPassword ? "text" : "password"}
               autoComplete="new-password"
-              placeholder="최소 8자"
+              placeholder="Min. 8 chars"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
             />
@@ -149,20 +153,21 @@ export default function SignupPage() {
               className="p-2 text-muted-foreground transition hover:text-foreground"
               type="button"
               onClick={() => setShowPassword((prev) => !prev)}
-              aria-label={showPassword ? "비밀번호 숨기기" : "비밀번호 표시"}
             >
               {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
             </button>
           </div>
-        </label>
-        <label className="space-y-2 text-sm font-medium text-foreground">
-          비밀번호 확인
-          <div className="flex items-center rounded-2xl border border-border bg-background/70 px-4">
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block">
+            Confirm Password
+          </label>
+          <div className="flex items-center border border-foreground/10 bg-background px-4">
             <input
               className="w-full bg-transparent py-3 text-sm outline-none"
               type={showConfirmPassword ? "text" : "password"}
               autoComplete="new-password"
-              placeholder="한 번 더 입력해주세요"
+              placeholder="Confirm password"
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
             />
@@ -170,19 +175,18 @@ export default function SignupPage() {
               className="p-2 text-muted-foreground transition hover:text-foreground"
               type="button"
               onClick={() => setShowConfirmPassword((prev) => !prev)}
-              aria-label={showConfirmPassword ? "비밀번호 숨기기" : "비밀번호 표시"}
             >
               {showConfirmPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
             </button>
           </div>
-        </label>
-        <p className="text-xs text-muted-foreground">
-          * 안전을 위해 특수문자/숫자를 포함한 8자 이상의 비밀번호를 권장합니다.
+        </div>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground italic">
+          * At least 8 characters with numbers & symbols recommended.
         </p>
         {message ? (
           <div
-            className={`rounded-2xl border px-4 py-3 text-sm ${message.type === "error"
-              ? "border-red-500/40 bg-red-500/10 text-red-500"
+            className={`border px-4 py-3 text-[11px] font-bold uppercase tracking-tight ${message.type === "error"
+              ? "border-destructive bg-destructive/10 text-destructive"
               : "border-emerald-500/40 bg-emerald-500/10 text-emerald-600"
               }`}
           >
@@ -190,38 +194,38 @@ export default function SignupPage() {
           </div>
         ) : null}
         <button
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex w-full items-center justify-center gap-2 bg-primary px-4 py-3 text-xs font-black uppercase tracking-[0.2em] text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           type="submit"
           disabled={isSubmitting}
         >
           {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : null}
-          계정 만들기
+          Create Account
         </button>
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-2 md:grid-cols-2">
           <button
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-2 border border-foreground/10 px-4 py-3 text-xs font-bold uppercase tracking-widest text-foreground transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-60"
             type="button"
             onClick={() => handleSocialSignup("google")}
             disabled={Boolean(socialLoading) || isSubmitting}
           >
             {socialLoading === "google" ? <Loader2 className="size-4 animate-spin" /> : <Chrome className="size-4" />}
-            Google로 가입하기
+            Google
           </button>
           <button
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-2 border border-foreground/10 px-4 py-3 text-xs font-bold uppercase tracking-widest text-foreground transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-60"
             type="button"
             onClick={() => handleSocialSignup("github")}
             disabled={Boolean(socialLoading) || isSubmitting}
           >
             {socialLoading === "github" ? <Loader2 className="size-4 animate-spin" /> : <Github className="size-4" />}
-            GitHub로 가입하기
+            GitHub
           </button>
         </div>
       </form>
-      <p className="mt-6 text-center text-sm text-muted-foreground">
-        이미 계정이 있나요?{" "}
-        <Link className="font-semibold text-primary underline-offset-4 hover:underline" href="/login">
-          로그인하기
+      <p className="mt-8 text-center text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+        Already have an account?{" "}
+        <Link className="text-foreground hover:underline" href="/login">
+          Sign In
         </Link>
       </p>
     </div>

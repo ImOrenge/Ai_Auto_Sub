@@ -81,13 +81,6 @@ export async function POST(request: Request) {
     // 1. Check Quotas
     const entitlements = await BillingService.getEntitlements(effectiveUserId);
     
-    // Concurrent Jobs Check
-    if (autoStart && entitlements.jobs.activeCount >= entitlements.jobs.concurrentExportsLimit) {
-      return NextResponse.json({ 
-        error: `Concurrent job limit reached (${entitlements.jobs.activeCount}/${entitlements.jobs.concurrentExportsLimit}). Please wait or upgrade.` 
-      }, { status: 429 });
-    }
-
     // Usage Limit Check
     const sub = await BillingService.getSubscription(effectiveUserId);
     if (sub.planId === "starter" && entitlements.credits.isOverLimit) {

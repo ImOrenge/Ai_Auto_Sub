@@ -1,0 +1,41 @@
+files:
+  deny_globs:
+  - .env
+  - '**/secrets/**'
+  - '**/*.pem'
+  allow_write_globs:
+  - '**/*.rs'
+  - '**/*.toml'
+  - '**/*.md'
+  - '**/*.json'
+  - '**/*.yml'
+  - '**/*.yaml'
+shell:
+  allow_cmds:
+  - rg
+  - git
+  - cargo
+  - npm
+  - pnpm
+  - pytest
+  - ls
+  - dir
+  - type
+  - cat
+  - pwd
+  - whoami
+  - where
+  - find
+  - findstr
+  - tree
+  - python
+  - python3
+  - node
+  - npx
+  deny_patterns:
+  - rm -rf
+  - curl | sh
+  - sudo
+approval:
+  destructive_ops: always
+  large_patch_lines: 200

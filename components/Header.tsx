@@ -6,6 +6,8 @@ import { LogoutButton } from "@/components/LogoutButton";
 import { useSidebar } from "./SidebarContext";
 import { Button } from "./ui/button";
 import { PanelLeft } from "lucide-react";
+import { LanguageSwitcher } from "./layout/LanguageSwitcher";
+import { useLanguage } from "@/lib/i18n";
 
 interface HeaderProps {
     isAuthenticated: boolean;
@@ -14,6 +16,7 @@ interface HeaderProps {
 
 export function Header({ isAuthenticated, title }: HeaderProps) {
     const { toggleCollapsed } = useSidebar();
+    const { t } = useLanguage();
 
     return (
         <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -34,6 +37,7 @@ export function Header({ isAuthenticated, title }: HeaderProps) {
                 </div>
 
                 <nav className="flex items-center gap-3 text-sm">
+                    <LanguageSwitcher />
                     <LogoutButton isAuthenticated={isAuthenticated} />
                     <Link
                         className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground"
@@ -41,7 +45,7 @@ export function Header({ isAuthenticated, title }: HeaderProps) {
                         target="_blank"
                         rel="noreferrer"
                     >
-                        Docs
+                        {t("common.docs")}
                         <span aria-hidden="true" className="text-[10px]">↗</span>
                     </Link>
                 </nav>

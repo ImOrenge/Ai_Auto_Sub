@@ -4,10 +4,12 @@ import React, { useEffect, useState } from 'react';
 import { ProjectCard } from '@/components/projects/ProjectCard';
 import { CreateProjectModal } from '@/components/projects/CreateProjectModal';
 import { Project } from '@/lib/projects/types';
+import { useLanguage } from '@/lib/i18n';
 
 import { mapProject } from '@/lib/projects/mapper';
 
 export default function ProjectsPage() {
+    const { t } = useLanguage();
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -36,9 +38,9 @@ export default function ProjectsPage() {
         <div className="container mx-auto px-4 py-8">
             <div className="flex items-center justify-between mb-8">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Projects</h1>
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t("dashboard.projects.title")}</h1>
                     <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        Manage your video projects and queues.
+                        {t("dashboard.projects.subtitle")}
                     </p>
                 </div>
                 <button
@@ -48,7 +50,7 @@ export default function ProjectsPage() {
                     <svg className="-ml-0.5 mr-1.5 h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
                     </svg>
-                    New Project
+                    {t("dashboard.projects.newProject")}
                 </button>
             </div>
 
@@ -63,8 +65,8 @@ export default function ProjectsPage() {
                     <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
                     </svg>
-                    <h3 className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">No projects</h3>
-                    <p className="mt-1 text-sm text-gray-500">Get started by creating a new project.</p>
+                    <h3 className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">{t("dashboard.projects.noProjects")}</h3>
+                    <p className="mt-1 text-sm text-gray-500">{t("dashboard.projects.noProjectsDesc")}</p>
                     <div className="mt-6">
                         <button
                             onClick={() => setIsCreateModalOpen(true)}
@@ -73,7 +75,7 @@ export default function ProjectsPage() {
                             <svg className="-ml-0.5 mr-1.5 h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                 <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
                             </svg>
-                            New Project
+                            {t("dashboard.projects.newProject")}
                         </button>
                     </div>
                 </div>

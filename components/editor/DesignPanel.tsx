@@ -28,6 +28,15 @@ const FONT_OPTIONS = [
     { value: "Gamja Flower", label: "감자꽃체 (귀여움)" },
     { value: "Sunflower", label: "해바라기체" },
 
+    // 일본어 (Japanese)
+    { value: "Noto Sans JP", label: "Noto Sans 일본어" },
+    { value: "Noto Serif JP", label: "Noto Serif 일본어" },
+    { value: "Zen Maru Gothic", label: "Zen 둥근 고딕" },
+    { value: "RocknRoll One", label: "RocknRoll One" },
+    { value: "Hachi Maru Pop", label: "Hachi Maru Pop" },
+    { value: "DotGothic16", label: "그래픽 픽셀 (DotGothic)" },
+    { value: "Dela Gothic One", label: "Dela Gothic One" },
+
     // 영문
     { value: "Arial", label: "Arial (영문)" },
 ];

@@ -4,9 +4,12 @@ import Link from "next/link";
 import { useState } from "react";
 import { NAV_ITEMS } from "@/lib/landing-data";
 import { LoginModal } from "./LoginModal";
+import { LanguageSwitcher } from "../layout/LanguageSwitcher";
+import { useLanguage } from "@/lib/i18n";
 
 export default function HeaderSticky() {
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+    const { t } = useLanguage();
 
     return (
         <>
@@ -26,17 +29,18 @@ export default function HeaderSticky() {
                     </nav>
 
                     <div className="flex items-center gap-2">
+                        <LanguageSwitcher />
                         <button
                             onClick={() => setIsLoginModalOpen(true)}
                             className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
                         >
-                            로그인
+                            {t("common.login")}
                         </button>
                         <Link
                             href="/signup"
                             className="bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity"
                         >
-                            무료로 시작
+                            {t("common.signup")}
                         </Link>
                     </div>
                 </div>

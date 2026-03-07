@@ -19,7 +19,7 @@ export const SubtitleConfigSchema = z.object({
   }).optional(),
   displayMode: z.enum(['standard', 'single-word']).optional(),
   videoFit: z.enum(['contain', 'cover']).optional(),
-  videoAspectRatio: z.enum(['original', '9:16', '1:1', '16:9']).optional(),
+  videoAspectRatio: z.enum(['original', '9:16', '1:1', '16:9', '4:5']).optional(),
 });
 
 export const CreateJobSchema = z.object({

@@ -19,14 +19,6 @@ export async function POST(
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
     }
 
-    // Check Quotas (Concurrent Jobs)
-    const entitlements = await BillingService.getEntitlements(job.userId || MOCK_USER_ID);
-    if (entitlements.jobs.activeCount >= entitlements.jobs.concurrentExportsLimit) {
-      return NextResponse.json({ 
-        error: `Concurrent job limit reached (${entitlements.jobs.activeCount}/${entitlements.jobs.concurrentExportsLimit}). Please wait or upgrade.` 
-      }, { status: 429 });
-    }
-
     // Start transcription pipeline in background
     // This pipeline handles: Sequence merging -> STT -> Translate -> Subtitle
     void processJobCaptions(jobId).catch(err => {

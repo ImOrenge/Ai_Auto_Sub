@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { PLANS, type Plan } from "@/lib/landing-data";
 import { Check, Minus, HelpCircle } from "lucide-react";
+import { useLanguage } from "@/lib/i18n";
 
 type Billing = "monthly" | "yearly";
 
@@ -56,12 +57,13 @@ const USAGE_INFO = [
 ];
 
 export default function PricingSection() {
+    const { t } = useLanguage();
     const [billing, setBilling] = useState<Billing>("monthly");
     const [showComparison, setShowComparison] = useState(false);
 
     const note = useMemo(() => {
-        return billing === "yearly" ? "연간 결제 시 약 20% 할인" : "월간 결제";
-    }, [billing]);
+        return billing === "yearly" ? t("pricing.yearlyNote") : t("pricing.monthlyNote");
+    }, [billing, t]);
 
     const renderValue = (value: boolean | string) => {
         if (typeof value === "boolean") {
@@ -79,13 +81,13 @@ export default function PricingSection() {
             {/* Header */}
             <div className="text-center mb-12">
                 <span className="inline-block px-3 py-1 text-xs font-medium bg-primary/10 text-primary rounded-full mb-4">
-                    Pricing
+                    {t("common.pricing")}
                 </span>
                 <h2 className="text-3xl font-bold md:text-4xl">
-                    필요에 맞는 플랜을 선택하세요
+                    {t("landing.pricing.title")}
                 </h2>
                 <p className="mt-4 max-w-2xl mx-auto text-muted-foreground">
-                    모든 플랜에 기본 STT와 편집 기능이 포함됩니다. 사용량과 비용은 투명하게 표시됩니다.
+                    {t("landing.pricing.subtitle")}
                 </p>
             </div>
 
@@ -99,7 +101,7 @@ export default function PricingSection() {
                             : "text-muted-foreground hover:text-foreground"
                             }`}
                     >
-                        월간
+                        {t("landing.pricing.monthly")}
                     </button>
                     <button
                         onClick={() => setBilling("yearly")}
@@ -108,8 +110,8 @@ export default function PricingSection() {
                             : "text-muted-foreground hover:text-foreground"
                             }`}
                     >
-                        연간
-                        <span className="ml-1 text-xs text-green-500 font-medium">-20%</span>
+                        {t("landing.pricing.yearly")}
+                        <span className="ml-1 text-xs text-green-500 font-medium">{t("landing.pricing.discount")}</span>
                     </button>
                 </div>
             </div>
@@ -143,7 +145,7 @@ export default function PricingSection() {
                             <span className="text-4xl font-bold">{priceLabel(p, billing)}</span>
                             {p.name !== "Enterprise" && priceLabel(p, billing) !== "Free" && (
                                 <span className="text-sm text-muted-foreground">
-                                    /{billing === "monthly" ? "월" : "월 (연간)"}
+                                    {billing === "monthly" ? t("landing.pricing.perMonth") : t("landing.pricing.perMonthYearly")}
                                 </span>
                             )}
                         </div>
@@ -176,7 +178,7 @@ export default function PricingSection() {
                     onClick={() => setShowComparison(!showComparison)}
                     className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
                 >
-                    {showComparison ? "비교표 접기" : "플랜 상세 비교표 보기"}
+                    {showComparison ? t("landing.pricing.comparison.toggleHide") : t("landing.pricing.comparison.toggleShow")}
                     <span className={`transition-transform ${showComparison ? "rotate-180" : ""}`}>▼</span>
                 </button>
             </div>
@@ -187,11 +189,11 @@ export default function PricingSection() {
                     <table className="w-full border-collapse text-sm">
                         <thead>
                             <tr className="border-b border-border">
-                                <th className="text-left py-4 px-4 font-semibold min-w-[200px]">Features</th>
+                                <th className="text-left py-4 px-4 font-semibold min-w-[200px]">{t("landing.pricing.comparison.features")}</th>
                                 <th className="text-center py-4 px-4 font-semibold">Starter</th>
                                 <th className="text-center py-4 px-4 font-semibold bg-primary/5 rounded-t-lg">
                                     Pro
-                                    <span className="ml-1 text-xs text-primary">(인기)</span>
+                                    <span className="ml-1 text-xs text-primary">({t("landing.pricing.popular")})</span>
                                 </th>
                                 <th className="text-center py-4 px-4 font-semibold">Plus</th>
                                 <th className="text-center py-4 px-4 font-semibold">Max</th>
@@ -221,17 +223,16 @@ export default function PricingSection() {
                 </div>
             )}
 
-            {/* Usage Info */}
             <div className="mt-12 p-6 rounded-2xl border border-border bg-muted/30">
                 <div className="flex items-center gap-2 mb-4">
                     <HelpCircle className="w-5 h-5 text-primary" />
-                    <h3 className="font-semibold">사용량 기준 안내</h3>
+                    <h3 className="font-semibold">{t("landing.pricing.usage.title")}</h3>
                 </div>
                 <div className="grid gap-4 md:grid-cols-3">
-                    {USAGE_INFO.map((info) => (
-                        <div key={info.label} className="p-4 rounded-xl bg-background border border-border">
-                            <div className="font-medium text-sm mb-1">{info.label}</div>
-                            <p className="text-xs text-muted-foreground">{info.desc}</p>
+                    {["processing", "export", "storage"].map((key) => (
+                        <div key={key} className="p-4 rounded-xl bg-background border border-border">
+                            <div className="font-medium text-sm mb-1">{t(`landing.pricing.usage.items.${key}.label`)}</div>
+                            <p className="text-xs text-muted-foreground">{t(`landing.pricing.usage.items.${key}.desc`)}</p>
                         </div>
                     ))}
                 </div>

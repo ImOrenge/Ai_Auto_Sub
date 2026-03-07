@@ -1,0 +1,4 @@
+interface:
+  display_name: "Windows Safety Guard"
+  short_description: "Guardrails for risky Windows setting changes"
+  default_prompt: "Use $windows-sensitive-settings-guard to avoid modifying sensitive Windows settings while helping with system tasks."

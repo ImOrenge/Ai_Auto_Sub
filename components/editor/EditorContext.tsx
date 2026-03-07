@@ -96,7 +96,7 @@ type EditorState = {
     /** Video display fit mode */
     videoFit: 'contain' | 'cover';
     /** Video display aspect ratio */
-    videoAspectRatio: 'original' | '9:16' | '1:1' | '16:9';
+    videoAspectRatio: 'original' | '9:16' | '1:1' | '16:9' | '4:5';
     /** Whether cropping mode is active */
     isCropping: boolean;
     /** Current crop area (percent 0-100) */
@@ -174,7 +174,7 @@ type EditorActions = {
     /** Set Video Fit */
     setVideoFit: (fit: 'contain' | 'cover') => void;
     /** Set Video Aspect Ratio */
-    setVideoAspectRatio: (ratio: 'original' | '9:16' | '1:1' | '16:9') => void;
+    setVideoAspectRatio: (ratio: 'original' | '9:16' | '1:1' | '16:9' | '4:5') => void;
     /** Set cropping mode */
     setIsCropping: (cropping: boolean) => void;
     /** Set crop area */
@@ -249,7 +249,7 @@ export function EditorProvider({ children, initialData, entitlements: initialEnt
     const [inPoint, setInPoint] = useState<number | null>(null);
     const [outPoint, setOutPoint] = useState<number | null>(null);
     const [videoFit, setVideoFitInternal] = useState<'contain' | 'cover'>('contain');
-    const [videoAspectRatio, setVideoAspectRatioInternal] = useState<'original' | '9:16' | '1:1' | '16:9'>('original');
+    const [videoAspectRatio, setVideoAspectRatioInternal] = useState<'original' | '9:16' | '1:1' | '16:9' | '4:5'>('original');
     const [isCropping, setIsCropping] = useState(false);
     const [cropArea, setCropAreaInternal] = useState(initialData?.defaultStyle?.cropArea ?? { x: 0, y: 0, width: 100, height: 100 });
     const [layers, setLayers] = useState<EditorLayer[]>([
@@ -264,7 +264,7 @@ export function EditorProvider({ children, initialData, entitlements: initialEnt
         setIsDirty(true);
     }, []);
 
-    const setVideoAspectRatio = useCallback((ratio: 'original' | '9:16' | '1:1' | '16:9') => {
+    const setVideoAspectRatio = useCallback((ratio: 'original' | '9:16' | '1:1' | '16:9' | '4:5') => {
         setVideoAspectRatioInternal(ratio);
         setIsDirty(true);
     }, []);
@@ -435,7 +435,9 @@ export function EditorProvider({ children, initialData, entitlements: initialEnt
             cues: allCombinedCues,
             defaultStyle: {
                 ...defaultStyle,
-                cropArea
+                cropArea,
+                sourceLanguage: language.sourceLanguage,
+                targetLanguage: language.targetLanguage,
             },
             language,
             videoAspectRatio,
@@ -449,38 +451,69 @@ export function EditorProvider({ children, initialData, entitlements: initialEnt
     }, []);
 
     const addLayer = useCallback((name?: string, initialAsset?: AssetRecord, type: SequenceLayerType = 'video') => {
-        const newLayer: EditorLayer = {
-            id: crypto.randomUUID(),
-            name: name || `${type.charAt(0).toUpperCase() + type.slice(1)} ${layers.length + 1}`,
-            type,
-            clips: initialAsset ? [
-                {
-                    id: crypto.randomUUID(),
-                    asset: initialAsset,
-                    startTime: 0,
-                    endTime: initialAsset.meta?.duration || 10,
-                    order: 0
+        const sourceLayerId = activeLayerIdRef.current;
+        const newId = crypto.randomUUID();
+
+        setLayers(prev => {
+            // 1. Save current state to the layer we are switching FROM
+            const updated = prev.map(layer => {
+                if (layer.id === sourceLayerId) {
+                    return { ...layer, clips, cues };
                 }
-            ] : [],
-            cues: [],
-        };
-        setLayers(prev => [...prev, newLayer]);
-        setActiveLayerId(newLayer.id);
-        activeLayerIdRef.current = newLayer.id;
-        setClips(newLayer.clips);
+                return layer;
+            });
+
+            // 2. Create the new layer
+            const newLayer: EditorLayer = {
+                id: newId,
+                name: name || `${type.charAt(0).toUpperCase() + type.slice(1)} ${updated.length + 1}`,
+                type,
+                clips: initialAsset ? [
+                    {
+                        id: crypto.randomUUID(),
+                        asset: initialAsset,
+                        startTime: 0,
+                        endTime: initialAsset.meta?.duration || 10,
+                        order: 0
+                    }
+                ] : [],
+                cues: [],
+            };
+            return [...updated, newLayer];
+        });
+
+        // 3. Switch global state to the new layer
+        setActiveLayerId(newId);
+        activeLayerIdRef.current = newId;
+        const initialClips = initialAsset ? [{
+            id: crypto.randomUUID(),
+            asset: initialAsset,
+            startTime: 0,
+            endTime: initialAsset.meta?.duration || 10,
+            order: 0
+        }] : [];
+        setClips(initialClips);
         setCuesInternal([]);
-        setDuration(initialAsset?.meta?.duration || 10);
         updateProblems([]);
+
+        // Only update duration if we added a media asset
+        if (initialAsset?.meta?.duration) {
+            setDuration(initialAsset.meta.duration);
+        }
+
         setIsDirty(true);
-    }, [layers.length, updateProblems]);
+    }, [clips, cues, updateProblems]);
 
     const switchLayer = useCallback((id: string) => {
         if (id === activeLayerId) return;
 
+        // Capture the ID of the layer we are switching FROM
+        const sourceLayerId = activeLayerIdRef.current;
+
         setLayers(prev => {
             // Save current state to the active layer before switching
             return prev.map(layer => {
-                if (layer.id === activeLayerIdRef.current) {
+                if (layer.id === sourceLayerId) {
                     return { ...layer, clips, cues };
                 }
                 return layer;

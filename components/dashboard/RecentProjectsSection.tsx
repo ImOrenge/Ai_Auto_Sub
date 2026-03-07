@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowRight, MoreHorizontal, Folder } from "lucide-react";
 import { routes } from "@/lib/routes";
+import { useLanguage } from "@/lib/i18n";
 import { Project } from "@/lib/projects/types";
 
 interface RecentProjectsSectionProps {
@@ -10,17 +11,19 @@ interface RecentProjectsSectionProps {
 }
 
 export function RecentProjectsSection({ projects }: RecentProjectsSectionProps) {
+    const { t } = useLanguage();
+
     if (projects.length === 0) return null;
 
     return (
         <section className="space-y-4">
             <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold tracking-tight">Recent Projects</h2>
+                <h2 className="text-xl font-semibold tracking-tight">{t("dashboard.recentProjects.title")}</h2>
                 <Link
                     href={routes.projects()}
                     className="text-sm text-primary font-medium hover:underline flex items-center gap-1"
                 >
-                    View All <ArrowRight className="size-3" />
+                    {t("dashboard.recentProjects.viewAll")} <ArrowRight className="size-3" />
                 </Link>
             </div>
 
@@ -50,7 +53,7 @@ export function RecentProjectsSection({ projects }: RecentProjectsSectionProps) 
                         {/* Status chips or quick stats could go here */}
                         <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800 flex gap-2">
                             <div className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
-                                Active
+                                {t("dashboard.recentProjects.active")}
                             </div>
                         </div>
                     </Link>

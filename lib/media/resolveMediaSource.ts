@@ -1,6 +1,7 @@
 import { load } from "cheerio";
 import { URL } from "node:url";
 import ytdl from "@distube/ytdl-core";
+import { env } from "@/lib/env";
 
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
@@ -12,6 +13,8 @@ const HTML_MEDIA_SELECTORS: Array<{ selector: string; attr: string }> = [
   { selector: 'source[src][type*="audio"]', attr: "src" },
   { selector: "meta[property='og:video'][content]", attr: "content" },
   { selector: "meta[property='twitter:player:stream'][content]", attr: "content" },
+  { selector: "meta[property='og:video:url'][content]", attr: "content" },
+  { selector: "meta[property='og:video:secure_url'][content]", attr: "content" },
 ];
 const MEDIA_EXTENSIONS = [".mp3", ".mp4", ".m4a", ".wav", ".webm", ".ogg", ".mov"];
 const MAX_HTML_BYTES = 2_000_000;
@@ -57,6 +60,15 @@ const DOWNLOAD_HEADERS = {
   "accept-language": "en-US,en;q=0.9",
 };
 
+const INSTAGRAM_HEADERS = {
+  ...DOWNLOAD_HEADERS,
+  "user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
+  "sec-fetch-dest": "document",
+  "sec-fetch-mode": "navigate",
+  "sec-fetch-site": "none",
+  "sec-fetch-user": "?1",
+};
+
 export async function resolveMediaSource(sourceUrl: string): Promise<MediaResolution> {
   const trimmed = sourceUrl.trim();
   if (!trimmed) {
@@ -68,6 +80,37 @@ export async function resolveMediaSource(sourceUrl: string): Promise<MediaResolu
 
   if (looksLikeYouTube(parsed)) {
     return await resolveViaYouTube(normalized, logs);
+  }
+
+  if (looksLikeTikTok(parsed) || looksLikeInstagram(parsed) || looksLikeFacebook(parsed)) {
+    const isInstagram = looksLikeInstagram(parsed);
+    const isFacebook = looksLikeFacebook(parsed);
+    logs.push({ level: "info", message: `URL recognized as ${isInstagram ? 'Instagram' : isFacebook ? 'Facebook' : 'TikTok'}.` });
+    
+    // First, let's try to resolve it via HTML as a more robust fallback
+    // especially for Instagram which often works better if we can find a direct link
+    if (isInstagram) {
+       try {
+         const resolved = await tryResolveFromHtml(normalized, logs, true);
+         if (resolved) {
+           logs.push({ level: "info", message: "Successfully resolved Instagram media via HTML scraping." });
+           return resolved;
+         }
+       } catch (err) {
+         logs.push({ level: "warn", message: `Instagram HTML resolution failed: ${err instanceof Error ? err.message : String(err)}` });
+       }
+    }
+
+    return {
+      kind: "direct", // Fallback to yt-dlp
+      sourceUrl: normalized,
+      resolvedUrl: normalized,
+      filename: null,
+      mimeType: "video/mp4",
+      contentLength: null,
+      durationMs: null,
+      logs,
+    };
   }
 
   const direct = await tryResolveDirect(normalized, logs);
@@ -100,12 +143,115 @@ function looksLikeYouTube(url: URL): boolean {
   );
 }
 
+function looksLikeTikTok(url: URL): boolean {
+  const host = url.hostname.toLowerCase();
+  return host.includes("tiktok.com");
+}
+
+function looksLikeInstagram(url: URL): boolean {
+  const host = url.hostname.toLowerCase();
+  return host.includes("instagram.com");
+}
+
+function looksLikeFacebook(url: URL): boolean {
+  const host = url.hostname.toLowerCase();
+  return host.includes("facebook.com") || host.includes("fb.watch") || host.includes("fb.com");
+}
+
+// List of public Piped API instances to try as fallback
+const PIPED_INSTANCES = [
+  "https://pipedapi.kavin.rocks",
+  "https://piped-api.garudalinux.org",
+  "https://api.piped.projectsegfau.lt",
+];
+
+function extractYouTubeVideoId(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    // youtu.be/<id>
+    if (parsed.hostname === "youtu.be") {
+      return parsed.pathname.slice(1).split("/")[0] || null;
+    }
+    // youtube.com/watch?v=<id> or /shorts/<id> or /embed/<id>
+    const vParam = parsed.searchParams.get("v");
+    if (vParam) return vParam;
+    const pathMatch = parsed.pathname.match(/\/(shorts|embed|v)\/([^/?#]+)/);
+    if (pathMatch) return pathMatch[2];
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+async function resolveViaYouTubePiped(
+  videoId: string,
+  logs: MediaResolutionLog[],
+): Promise<MediaResolution | null> {
+  for (const instance of PIPED_INSTANCES) {
+    try {
+      const res = await safeFetch(`${instance}/streams/${videoId}`, {
+        headers: { "User-Agent": USER_AGENT },
+      });
+      if (!res || !res.ok) continue;
+
+      const data = await res.json() as {
+        title?: string;
+        uploader?: string;
+        duration?: number;
+        videoStreams?: Array<{ url: string; mimeType: string; quality: string; videoOnly?: boolean }>;
+        audioStreams?: Array<{ url: string; mimeType: string; quality: string }>;
+      };
+
+      // Prefer a muxed stream (both video+audio), fall back to best video-only then audio-only
+      const muxed = (data.videoStreams ?? []).find(s => !s.videoOnly);
+      const bestVideo = (data.videoStreams ?? [])[0];
+      const bestAudio = (data.audioStreams ?? [])[0];
+      const stream = muxed ?? bestVideo ?? bestAudio;
+
+      if (!stream?.url) continue;
+
+      const title = data.title ?? null;
+      const filename = title
+        ? `${sanitizeFilename(title)}.${stream.mimeType?.includes("mp4") ? "mp4" : "webm"}`
+        : null;
+
+      logs.push({ level: "info", message: `Resolved via Piped instance: ${instance}` });
+
+      return {
+        kind: "youtube",
+        sourceUrl: `https://www.youtube.com/watch?v=${videoId}`,
+        resolvedUrl: stream.url,
+        filename,
+        mimeType: stream.mimeType?.split(";")[0] ?? null,
+        contentLength: null,
+        durationMs: data.duration ? data.duration * 1000 : null,
+        logs,
+        metadata: {
+          title: title ?? undefined,
+          channel: data.uploader ?? undefined,
+          videoId,
+          pipedProxy: `https://piped.video/watch?v=${videoId}`,
+        },
+      };
+    } catch (err) {
+      logs.push({ level: "warn", message: `Piped instance ${instance} failed: ${err instanceof Error ? err.message : String(err)}` });
+    }
+  }
+  return null;
+}
+
 async function resolveViaYouTube(
   url: string,
   logs: MediaResolutionLog[],
 ): Promise<MediaResolution> {
+  // --- Primary: ytdl-core ---
   try {
-    const info = await ytdl.getInfo(url);
+    const videoIdFromUrl = extractYouTubeVideoId(url);
+    const info = await ytdl.getInfo(url, {
+      requestOptions: {
+        headers: buildYouTubeRequestHeaders(videoIdFromUrl),
+      },
+    });
     const muxed = ytdl.chooseFormat(info.formats, {
       filter: (format) => format.hasVideo && format.hasAudio,
       quality: "highest",
@@ -133,10 +279,7 @@ async function resolveViaYouTube(
       pipedProxy: videoId ? `https://piped.video/watch?v=${videoId}` : undefined,
     };
 
-    logs.push({
-      level: "info",
-      message: "Resolved media via YouTube metadata.",
-    });
+    logs.push({ level: "info", message: "Resolved media via YouTube metadata." });
 
     return {
       kind: "youtube",
@@ -151,12 +294,35 @@ async function resolveViaYouTube(
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown YouTube resolution error";
-    logs.push({
-      level: "warn",
-      message: `YouTube resolution failed: ${message}`,
-    });
-    throw new Error(message);
+    logs.push({ level: "warn", message: `ytdl-core failed: ${message}. Trying Piped API fallback...` });
   }
+
+  // --- Fallback: Piped public API ---
+  const videoId = extractYouTubeVideoId(url);
+  if (videoId) {
+    const piped = await resolveViaYouTubePiped(videoId, logs);
+    if (piped) return piped;
+  }
+
+  logs.push({
+    level: "warn",
+    message: "YouTube metadata resolution failed. Falling back to direct downloader.",
+  });
+
+  return {
+    kind: "youtube",
+    sourceUrl: url,
+    resolvedUrl: url,
+    filename: videoId ? `youtube-${videoId}.mp4` : null,
+    mimeType: "video/mp4",
+    contentLength: null,
+    durationMs: null,
+    logs,
+    metadata: {
+      videoId: videoId ?? undefined,
+      pipedProxy: videoId ? `https://piped.video/watch?v=${videoId}` : undefined,
+    },
+  };
 }
 
 async function tryResolveDirect(
@@ -184,9 +350,10 @@ async function tryResolveDirect(
 async function tryResolveFromHtml(
   url: string,
   logs: MediaResolutionLog[],
+  isInstagram: boolean = false,
 ): Promise<MediaResolution | null> {
   const response = await safeFetch(url, {
-    headers: DOWNLOAD_HEADERS,
+    headers: isInstagram ? INSTAGRAM_HEADERS : DOWNLOAD_HEADERS,
     redirect: "follow",
   });
   if (!response || !response.ok) {
@@ -200,6 +367,28 @@ async function tryResolveFromHtml(
   const html = await readHtmlWithLimit(response, MAX_HTML_BYTES);
   const $ = load(html);
   const seen = new Set<string>();
+
+  // Look for JSON-LD or script tags with video data (Instagram often hides links here)
+  $('script[type="application/ld+json"]').each((_, el) => {
+    try {
+      const json = JSON.parse($(el).html() || "{}");
+      if (json.video?.contentUrl) seen.add(json.video.contentUrl);
+      if (Array.isArray(json)) {
+        for (const item of json) {
+           if (item.video?.contentUrl) seen.add(item.video.contentUrl);
+        }
+      }
+    } catch { /* ignore */ }
+  });
+
+  // Also look for regular scripts that might contain video URL strings
+  if (isInstagram) {
+    const rawHtml = html.replace(/\\/g, '');
+    const videoMatches = rawHtml.match(/https:\/\/scontent[^"]+?\.mp4[^"]*/g);
+    if (videoMatches) {
+      for (const match of videoMatches) seen.add(match);
+    }
+  }
 
   for (const entry of HTML_MEDIA_SELECTORS) {
     $(entry.selector).each((_, el) => {
@@ -414,6 +603,22 @@ function looksLikeMediaExtension(url: string | null): boolean {
 
 function sanitizeFilename(filename: string): string {
   return filename.replace(/[<>:"/\\|?*\x00-\x1F]/g, "").trim();
+}
+
+function buildYouTubeRequestHeaders(videoId?: string | null): Record<string, string> {
+  const headers: Record<string, string> = {
+    ...DOWNLOAD_HEADERS,
+    origin: "https://www.youtube.com",
+    referer: videoId
+      ? `https://www.youtube.com/watch?v=${videoId}`
+      : "https://www.youtube.com/",
+  };
+
+  if (env.youtubeCookie) {
+    headers.cookie = env.youtubeCookie;
+  }
+
+  return headers;
 }
 
 async function safeFetch(url: string, init: RequestInit): Promise<Response | null> {

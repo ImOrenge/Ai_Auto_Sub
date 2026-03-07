@@ -12,7 +12,10 @@ import {
     MoreVertical,
     Check,
     X,
-    Edit2
+    Edit2,
+    Video,
+    Music,
+    Type
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -56,14 +59,31 @@ export function LayerManager() {
                     <Layers className="size-3.5 text-primary" />
                     <span>Layers</span>
                 </div>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-6 rounded-md hover:bg-primary/10 hover:text-primary"
-                    onClick={() => addLayer()}
-                >
-                    <Plus className="size-3.5" />
-                </Button>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-6 rounded-md hover:bg-primary/10 hover:text-primary"
+                        >
+                            <Plus className="size-3.5" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-40">
+                        <DropdownMenuItem onClick={() => addLayer(undefined, undefined, 'video')}>
+                            <Video className="size-3 mr-2" />
+                            <span>Video Track</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => addLayer(undefined, undefined, 'audio')}>
+                            <Music className="size-3 mr-2" />
+                            <span>Audio Track</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => addLayer(undefined, undefined, 'caption')}>
+                            <Type className="size-3 mr-2" />
+                            <span>Caption Track</span>
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
 
             <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">

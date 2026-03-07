@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
     FileVideo,
     Plus,
@@ -19,6 +19,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { AssetRecord } from "@/lib/assets/types";
+
+import { MUSIC_SAMPLES } from "@/lib/assets/samples";
 
 interface SourcePanelProps {
     projectId: string;
@@ -43,7 +45,46 @@ export function SourcePanel({
     const [isUploading, setIsUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
 
-    const [selectedTab, setSelectedTab] = useState<'all' | 'video' | 'audio'>('all');
+    const [selectedTab, setSelectedTab] = useState<'all' | 'video' | 'audio' | 'samples'>('all');
+
+    // Add polling for assets that are processing
+    useEffect(() => {
+        const needsPolling = assets.some(a =>
+            a.status === 'downloading' ||
+            a.status === 'processing' ||
+            a.status === 'uploading' ||
+            a.transcriptionStatus === 'transcribing'
+        );
+
+        if (!needsPolling) return;
+
+        const pollInterval = setInterval(async () => {
+            try {
+                const res = await fetch(`/api/assets?projectId=${projectId}&limit=50`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.assets) {
+                        onAssetsChange(data.assets);
+
+                        // Check if we still need polling
+                        const stillNeedsPolling = data.assets.some((a: AssetRecord) =>
+                            a.status === 'downloading' ||
+                            a.status === 'processing' ||
+                            a.status === 'uploading' ||
+                            a.transcriptionStatus === 'transcribing'
+                        );
+                        if (!stillNeedsPolling) {
+                            clearInterval(pollInterval);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("[SourcePanel] Polling failed:", err);
+            }
+        }, 3000);
+
+        return () => clearInterval(pollInterval);
+    }, [projectId, assets, onAssetsChange]);
 
     const filteredAssets = assets.filter(a => {
         const matchesSearch = a.filename.toLowerCase().includes(searchQuery.toLowerCase());
@@ -166,6 +207,38 @@ export function SourcePanel({
         }
     };
 
+    const handleSelectSample = async (sample: typeof MUSIC_SAMPLES[0]) => {
+        if (isResolving) return;
+
+        setIsResolving(true);
+        try {
+            const res = await fetch('/api/assets', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    projectId,
+                    sourceUrl: sample.sourceUrl,
+                    filename: sample.filename,
+                    meta: {
+                        duration: sample.duration,
+                        mimeType: 'audio/mpeg',
+                        category: sample.category
+                    }
+                })
+            });
+
+            if (res.ok) {
+                const newAsset = await res.json();
+                onAssetsChange([newAsset, ...assets]);
+                setSelectedTab('audio'); // Switch to audio tab to show the newly added sample
+            }
+        } catch (err) {
+            console.error("Failed to add sample", err);
+        } finally {
+            setIsResolving(false);
+        }
+    };
+
     return (
         <div className="flex flex-col h-full bg-card overflow-hidden">
             {/* Header / Actions - Streamlined */}
@@ -284,6 +357,15 @@ export function SourcePanel({
                         )}
                     >
                         Audio
+                    </button>
+                    <button
+                        onClick={() => setSelectedTab('samples')}
+                        className={cn(
+                            "flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all",
+                            selectedTab === 'samples' ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:bg-muted/30"
+                        )}
+                    >
+                        Samples
                     </button>
                 </div>
             </div>

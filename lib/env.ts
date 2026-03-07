@@ -42,5 +42,6 @@ export const env = {
   translationProvider: process.env.TRANSLATION_PROVIDER ?? 'openai',
   translationModel: process.env.TRANSLATION_MODEL ?? 'gpt-4o-mini',
   youtubeCookie: process.env.YOUTUBE_COOKIE ?? null,
+  instagramCookie: process.env.INSTAGRAM_COOKIE ?? null,
   ytDlpPath: process.env.YT_DLP_PATH ?? 'yt-dlp',
 };

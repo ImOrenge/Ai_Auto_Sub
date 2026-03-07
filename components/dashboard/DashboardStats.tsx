@@ -5,6 +5,7 @@ import { CreditCard, Clock, Activity, ArrowRight, Loader2, Sparkles } from "luci
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { routes } from "@/lib/routes";
+import { useLanguage } from "@/lib/i18n";
 
 type UsageData = {
     period: { start: string; end: string };
@@ -16,6 +17,7 @@ type UsageData = {
 };
 
 export function DashboardStats() {
+    const { t } = useLanguage();
     const [data, setData] = useState<UsageData | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -61,7 +63,7 @@ export function DashboardStats() {
                         <Clock className="size-6" />
                     </div>
                     <div>
-                        <p className="text-sm font-medium text-muted-foreground">Monthly Usage</p>
+                        <p className="text-sm font-medium text-muted-foreground">{t("dashboard.stats.monthlyusage")}</p>
                         <h3 className="text-2xl font-bold">{sttMinutes.toFixed(1)} <span className="text-sm font-normal text-muted-foreground">min</span></h3>
                     </div>
                 </div>
@@ -76,8 +78,8 @@ export function DashboardStats() {
                         />
                     </div>
                     <div className="flex justify-between text-[11px] text-muted-foreground">
-                        <span>{percentage.toFixed(0)}% used</span>
-                        <span>Limit: {limitMinutes}m</span>
+                        <span>{percentage.toFixed(0)}% {t("dashboard.stats.used")}</span>
+                        <span>{t("dashboard.stats.limit")}: {limitMinutes}m</span>
                     </div>
                 </div>
             </div>
@@ -93,7 +95,7 @@ export function DashboardStats() {
                             <CreditCard className="size-6" />
                         </div>
                         <div>
-                            <p className="text-sm font-medium text-muted-foreground">Available Credits</p>
+                            <p className="text-sm font-medium text-muted-foreground">{t("dashboard.stats.creditsUsed")}</p>
                             <h3 className="text-2xl font-bold">{available.toFixed(1)} <span className="text-sm font-normal text-muted-foreground">min</span></h3>
                         </div>
                     </div>
@@ -102,7 +104,7 @@ export function DashboardStats() {
                     href={routes.settings.billing()}
                     className="w-full flex items-center justify-center gap-2 py-2 text-sm font-medium border rounded-none hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                 >
-                    Top up Credits <ArrowRight className="size-4" />
+                    {t("dashboard.stats.topUp")} <ArrowRight className="size-4" />
                 </Link>
             </div>
 
@@ -113,17 +115,17 @@ export function DashboardStats() {
                         <Sparkles className="size-6" />
                     </div>
                     <div>
-                        <p className="text-sm font-medium text-white/80">Account Status</p>
-                        <h3 className="text-xl font-bold">Pro Plan</h3>
+                        <p className="text-sm font-medium text-white/80">{t("dashboard.stats.accountStatus")}</p>
+                        <h3 className="text-xl font-bold">{t("dashboard.stats.proPlan")}</h3>
                     </div>
                 </div>
                 <div className="flex flex-col gap-2">
-                    <p className="text-xs text-white/70">Enjoy unlimited translations and priority processing.</p>
+                    <p className="text-xs text-white/70">{t("dashboard.stats.proPlanDesc")}</p>
                     <Link
                         href={routes.settings.profile()}
                         className="mt-2 w-full flex items-center justify-center gap-2 py-2 text-sm font-medium bg-white/10 hover:bg-white/20 rounded-none transition-colors backdrop-blur-sm"
                     >
-                        View Account Settings
+                        {t("dashboard.stats.viewSettings")}
                     </Link>
                 </div>
             </div>

@@ -119,7 +119,7 @@ async function ensureSignedUrl(input: string | null): Promise<string | null> {
       expiresAt: Date.now() + CACHE_TTL_MS
     });
     
-    // Only log in development to reduce Railway log spam
+    // Only log in development to reduce log spam
     if (process.env.NODE_ENV === 'development') {
       console.debug(`[storage] Signed URL created and cached: ${signedUrl.slice(0, 50)}...`);
     }

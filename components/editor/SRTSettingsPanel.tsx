@@ -343,7 +343,7 @@ function CaptionsTab({
                     </div>
                 ) : (
                     captions.map((cue) => {
-                        const isActive = currentTime >= cue.startTime && currentTime <= cue.endTime;
+                        const isActive = currentTime >= cue.startTime && currentTime < cue.endTime;
                         return (
                             <div
                                 key={`${cue.layerId}-${cue.id}`}

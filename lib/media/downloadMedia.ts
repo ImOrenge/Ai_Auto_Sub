@@ -1,4 +1,4 @@
-﻿import { createWriteStream } from "node:fs";
+import { createWriteStream } from "node:fs";
 import { mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -46,39 +46,41 @@ export async function downloadMediaToFile(
   url: string,
   options: DownloadMediaOptions = {},
 ): Promise<DownloadMediaResult> {
-  const shouldUseYtdl =
-    options.kind === "youtube" ||
-    looksLikeYouTubeUrl(options.sourceUrl) ||
-    looksLikeYouTubeUrl(url);
+  const isSocial = looksLikeAnySocialUrl(options.sourceUrl ?? url);
   const youtubeIdForFallback =
     options.youtubeVideoId ??
     extractYoutubeVideoId(options.sourceUrl) ??
     extractYoutubeVideoId(url);
 
-  if (shouldUseYtdl) {
+  if (isSocial) {
     const videoId = youtubeIdForFallback ?? extractYoutubeVideoId(options.sourceUrl) ?? extractYoutubeVideoId(url);
-    console.info(`[media] YouTube download requested for videoId: ${videoId}`);
+    console.info(`[media] Social media download requested for: ${options.sourceUrl ?? url}`);
     
-    // Try yt-dlp first (most reliable against YouTube blocks)
+    // Try yt-dlp first (most reliable against social media blocks)
     const ytDlpReady = await isYtDlpAvailable();
     console.info(`[media] yt-dlp available: ${ytDlpReady}`);
     
-    if (videoId && ytDlpReady) {
+    if (ytDlpReady) {
       try {
-        console.info(`[media] Attempting download via yt-dlp for ${videoId}...`);
-        return await downloadViaYtDlp(videoId, options);
+        console.info(`[media] Attempting download via yt-dlp for ${options.sourceUrl ?? url}...`);
+        return await downloadViaYtDlp(options.sourceUrl ?? url, options);
       } catch (ytDlpError) {
         const reason = ytDlpError instanceof Error ? ytDlpError.message : String(ytDlpError);
-        console.warn(`[media] yt-dlp failed for video ${videoId}: ${reason}. Falling back to ytdl-core.`);
+        console.warn(`[media] yt-dlp failed for ${options.sourceUrl ?? url}: ${reason}.`);
+        if (videoId) {
+           console.warn(`[media] Falling back to ytdl-core/Innertube for YouTube video ${videoId}.`);
+        } else {
+           throw ytDlpError;
+        }
       }
     }
     
-    // Fallback to ytdl-core
-    try {
-      console.info(`[media] Attempting download via ytdl-core...`);
-      return await downloadViaYtdl(options.sourceUrl ?? url, options);
-    } catch (error) {
-      if (videoId) {
+    if (videoId) {
+      // Fallback to ytdl-core for YouTube
+      try {
+        console.info(`[media] Attempting download via ytdl-core...`);
+        return await downloadViaYtdl(options.sourceUrl ?? url, options);
+      } catch (error) {
         const reason = error instanceof Error ? error.message : String(error);
         console.warn(
           `[media] ytdl-core failed for video ${videoId}: ${reason}. Falling back to Innertube.`,
@@ -86,7 +88,6 @@ export async function downloadMediaToFile(
         console.info(`[media] Attempting download via Innertube...`);
         return await downloadViaInnertube(videoId, options);
       }
-      throw error;
     }
   }
 
@@ -163,7 +164,17 @@ async function downloadViaYtdl(
   options: DownloadMediaOptions,
 ): Promise<DownloadMediaResult> {
   const normalizedSource = coerceYouTubeSource(options, source);
-  const info = await ytdl.getInfo(normalizedSource);
+  const youtubeVideoId =
+    options.youtubeVideoId ?? extractYoutubeVideoId(options.sourceUrl) ?? extractYoutubeVideoId(source);
+  const youtubeHeaders = {
+    ...DOWNLOAD_HEADERS,
+    ...buildYoutubeRequestHeaders(youtubeVideoId),
+  };
+  const info = await ytdl.getInfo(normalizedSource, {
+    requestOptions: {
+      headers: youtubeHeaders,
+    },
+  });
   const muxed = ytdl.chooseFormat(info.formats, {
     quality: "highest",
     filter: (format) => format.hasVideo && format.hasAudio,
@@ -196,7 +207,7 @@ async function downloadViaYtdl(
   const readable = ytdl.downloadFromInfo(info, {
     format,
     requestOptions: {
-      headers: DOWNLOAD_HEADERS,
+      headers: youtubeHeaders,
     },
   });
 
@@ -249,6 +260,37 @@ function looksLikeYouTubeUrl(value?: string | null): boolean {
     return false;
   }
 }
+
+function looksLikeAnySocialUrl(value?: string | null): boolean {
+  if (!value) return false;
+  try {
+    const parsed = new URL(value);
+    const host = parsed.hostname.toLowerCase();
+    return (
+      host.includes("youtube.com") ||
+      host.includes("youtu.be") ||
+      host.includes("youtube-nocookie.com") ||
+      host.includes("tiktok.com") ||
+      host.includes("instagram.com") ||
+      host.includes("facebook.com") ||
+      host.includes("fb.watch") ||
+      host.includes("fb.com")
+    );
+  } catch {
+    return false;
+  }
+}
+
+function looksLikeInstagramUrl(value?: string | null): boolean {
+  if (!value) return false;
+  try {
+    const parsed = new URL(value);
+    return parsed.hostname.toLowerCase().includes("instagram.com");
+  } catch {
+    return false;
+  }
+}
+
 
 function coerceYouTubeSource(options: DownloadMediaOptions, fallback: string): string {
   if (options.youtubeVideoId && ytdl.validateID(options.youtubeVideoId)) {
@@ -475,27 +517,33 @@ async function isYtDlpAvailable(): Promise<boolean> {
 }
 
 async function downloadViaYtDlp(
-  videoId: string,
+  input: string,
   options: DownloadMediaOptions,
 ): Promise<DownloadMediaResult> {
   const dir = await mkdtemp(path.join(tmpdir(), TMP_PREFIX));
-  // Use videoId for filename to avoid special character issues with FFmpeg merge
+  
+  // Determine video ID or use hash of URL for filename
+  const videoId = extractYoutubeVideoId(input) ?? Buffer.from(input).toString('base64').substring(0, 10);
   const outputTemplate = path.join(dir, `${videoId}.%(ext)s`);
   
   // Check if cookie is in Netscape format (contains tabs or starts with # Netscape)
-  const isNetscapeCookie = env.youtubeCookie && (
-    env.youtubeCookie.includes("# Netscape HTTP Cookie File") ||
-    env.youtubeCookie.includes("\t")  // Netscape format uses tabs
+  const isInstagram = looksLikeInstagramUrl(input);
+  const isYouTube = looksLikeYouTubeUrl(input);
+  const cookieSource = isInstagram ? env.instagramCookie : (isYouTube ? env.youtubeCookie : null);
+  
+  const isNetscapeCookie = cookieSource && (
+    cookieSource.includes("# Netscape HTTP Cookie File") ||
+    cookieSource.includes("\t")  // Netscape format uses tabs
   );
   
   const cookieFile = isNetscapeCookie ? path.join(dir, "cookies.txt") : null;
 
   // Write cookie file only if in valid Netscape format
-  if (cookieFile && env.youtubeCookie) {
-    await writeFile(cookieFile, env.youtubeCookie, "utf-8");
-    console.info("[media] Using Netscape format cookie file for yt-dlp");
-  } else if (env.youtubeCookie) {
-    console.warn("[media] YOUTUBE_COOKIE is not in Netscape format, skipping cookie usage for yt-dlp");
+  if (cookieFile && cookieSource) {
+    await writeFile(cookieFile, cookieSource, "utf-8");
+    console.info(`[media] Using Netscape format cookie file for ${isInstagram ? 'Instagram' : isYouTube ? 'YouTube' : 'media'}`);
+  } else if (cookieSource) {
+    console.info(`[media] Using raw cookie header for ${isInstagram ? 'Instagram' : isYouTube ? 'YouTube' : 'media'} yt-dlp request.`);
   }
 
   const args: string[] = [
@@ -509,11 +557,27 @@ async function downloadViaYtDlp(
     "--no-warnings",
   ];
 
-  if (cookieFile) {
-    args.push("--cookies", cookieFile);
+  if (isInstagram) {
+    // Specialized headers for Instagram to avoid 401/403
+    args.push("--add-header", "User-Agent:Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1");
+    args.push("--add-header", "Accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8");
+    args.push("--add-header", "Accept-Language:en-US,en;q=0.5");
+    args.push("--add-header", "Sec-Fetch-Dest:document");
+    args.push("--add-header", "Sec-Fetch-Mode:navigate");
+    args.push("--add-header", "Sec-Fetch-Site:none");
+    args.push("--add-header", "Sec-Fetch-User:?1");
   }
 
-  args.push(`https://www.youtube.com/watch?v=${videoId}`);
+  if (cookieFile) {
+    args.push("--cookies", cookieFile);
+  } else if (cookieSource) {
+    args.push("--add-header", `Cookie:${cookieSource}`);
+  }
+
+  // Handle both YouTube video IDs and full URLs for other platforms
+  const isYoutubeId = /^[a-zA-Z0-9_-]{11}$/.test(input);
+  const targetUrl = isYoutubeId ? `https://www.youtube.com/watch?v=${input}` : input;
+  args.push(targetUrl);
 
   const result = await spawnYtDlp(args);
 

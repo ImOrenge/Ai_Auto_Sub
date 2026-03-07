@@ -200,7 +200,7 @@ function measureMediaDuration(filePath: string): Promise<number> {
 }
 
 
-export async function callWhisper(audio: DownloadedAudio): Promise<TranscriptionResult> {
+export async function callWhisper(audio: DownloadedAudio, language?: string): Promise<TranscriptionResult> {
   const prepared = await prepareAudioForWhisper(audio);
 
   try {
@@ -219,13 +219,13 @@ export async function callWhisper(audio: DownloadedAudio): Promise<Transcription
       response_format: "verbose_json",
       timestamp_granularities: ["word", "segment"], // Request BOTH word and segment timestamps
       temperature: 0,
+      language: language && language !== 'auto' ? language : undefined,
     }, {
       timeout: 120000, // 2 minute timeout for Whisper
     });
 
-    console.error(`[stt] Whisper API response received successfully.`);
-
     const payload = response as unknown as WhisperVerboseResponse;
+    console.error(`[stt] Whisper API response received successfully. Detected language: ${payload.language}`);
     const finalSegments: TranscriptSegment[] = [];
 
     if (payload.segments && payload.segments.length > 0) {
@@ -281,6 +281,7 @@ export async function callWhisper(audio: DownloadedAudio): Promise<Transcription
 export async function translateSegments(
   transcription: TranscriptionResult,
   targetLocale: string,
+  sourceLocale?: string,
 ): Promise<TranslationResult> {
   const CHUNK_SIZE = 25; // Translate 25 segments at a time
   const segments = transcription.segments;
@@ -303,7 +304,7 @@ export async function translateSegments(
         messages: [
           {
             role: "system",
-            content: `You are a professional subtitling assistant that translates text into ${targetLocale}. Return JSON with a "segments" array containing the same number of items.`,
+            content: `You are a professional subtitling assistant that translates text ${sourceLocale ? `from ${sourceLocale} ` : ""}into ${targetLocale}. Return JSON with a "segments" array containing the same number of items.`,
           },
           {
             role: "user",
@@ -475,7 +476,8 @@ export async function applySubtitlesToVideo(
   cues?: SubtitleCue[], // Added for Remotion
   jobId?: string, // Added for UI progress updates
   renderer?: 'canvas', // Deprecated: 'remotion', 'ffmpeg'
-  aspectRatio?: 'original' | '9:16' | '1:1' | '16:9' // Target aspect ratio from editor
+  aspectRatio?: 'original' | '9:16' | '1:1' | '16:9', // Target aspect ratio from editor
+  watermarkText?: string
 ): Promise<CaptionedVideoResult> {
   console.info(`[caption] Checking if media is video-like:`);
   console.info(`[caption]   mimeType: ${media.mimeType}`);
@@ -528,7 +530,7 @@ export async function applySubtitlesToVideo(
         outputPath.replaceAll("\\", "/"),
         cues || [], // Pass empty array if no cues
         subtitleConfig || { ...DEFAULT_SUBTITLE_CONFIG, fontName: 'Arial' },
-        { jobId, resolution, aspectRatio }
+        { jobId, resolution, aspectRatio, watermarkText }
       );
     } else {
       console.warn(`[caption] No cues and no format changes requested. Copying original video.`);
@@ -732,7 +734,7 @@ export async function prepareTrimmedAudio(
  * Concatenates multiple clips into a single file
  */
 export async function concatenateClips(
-  clips: { filePath: string; start: number; end: number }[],
+  clips: { filePath: string; start: number; end: number; speed?: number }[],
   outputPath: string
 ): Promise<void> {
   if (clips.length === 0) throw new Error("No clips to concatenate");
@@ -740,10 +742,28 @@ export async function concatenateClips(
 
   if (clips.length === 1) {
     const clip = clips[0];
+    const speed = clip.speed && clip.speed > 0 ? clip.speed : 1;
+    const duration = clip.end - clip.start;
     await new Promise<void>((resolve, reject) => {
-      ffmpeg(clip.filePath.replaceAll("\\", "/"))
-        .setStartTime(clip.start)
-        .setDuration(clip.end - clip.start)
+      const command = ffmpeg(clip.filePath.replaceAll("\\", "/"));
+
+      if (speed === 1) {
+        command
+          .setStartTime(clip.start)
+          .setDuration(duration);
+      } else {
+        command.complexFilter(
+          [
+            `[0:v]trim=start=${clip.start}:end=${clip.end},setpts=(PTS-STARTPTS)/${speed}[v_out]`,
+            `[0:a]atrim=start=${clip.start}:end=${clip.end},asetpts=PTS-STARTPTS,atempo=${speed}[a_out]`,
+          ],
+          ["v_out", "a_out"],
+        )
+          .map("v_out")
+          .map("a_out");
+      }
+
+      command
         .on("error", (e) => reject(e))
         .on("end", () => resolve())
         .save(outputPath.replaceAll("\\", "/"));
@@ -759,8 +779,13 @@ export async function concatenateClips(
     command.input(clip.filePath.replaceAll("\\", "/"));
     const vLabel = `v${i}`;
     const aLabel = `a${i}`;
-    filterParts.push(`[${i}:v]trim=start=${clip.start}:end=${clip.end},setpts=PTS-STARTPTS[${vLabel}]`);
-    filterParts.push(`[${i}:a]atrim=start=${clip.start}:end=${clip.end},asetpts=PTS-STARTPTS[${aLabel}]`);
+    const speed = clip.speed && clip.speed > 0 ? clip.speed : 1;
+    filterParts.push(
+      `[${i}:v]trim=start=${clip.start}:end=${clip.end},setpts=(PTS-STARTPTS)/${speed}[${vLabel}]`
+    );
+    filterParts.push(
+      `[${i}:a]atrim=start=${clip.start}:end=${clip.end},asetpts=PTS-STARTPTS,atempo=${speed}[${aLabel}]`
+    );
     concatInputs.push(`[${vLabel}][${aLabel}]`);
   });
 
@@ -813,7 +838,10 @@ export async function prepareSequenceMedia(
   const cacheKey = buildSequenceCacheKey(sequence);
   const cacheFilename = path.basename(cacheKey.storageKey);
   const estimatedDurationMs =
-    clipsToProcess.reduce((acc, clip) => acc + (clip.endTime - clip.startTime), 0) * 1000;
+    clipsToProcess.reduce((acc, clip) => {
+      const speed = clip.speed && clip.speed > 0 ? clip.speed : 1;
+      return acc + ((clip.endTime - clip.startTime) / speed);
+    }, 0) * 1000;
 
   try {
     let cachedEntry = null;
@@ -863,7 +891,7 @@ export async function prepareSequenceMedia(
     console.warn(`[sequence] Cached sequence lookup failed for job ${jobId}`, error);
   }
 
-  const clipsToJoin: { filePath: string; start: number; end: number }[] = [];
+  const clipsToJoin: { filePath: string; start: number; end: number; speed?: number }[] = [];
   const workDir = await mkdtemp(path.join(tmpdir(), "ai-subauto-seq-"));
 
   try {
@@ -893,6 +921,7 @@ export async function prepareSequenceMedia(
         filePath: downloaded.audioFile,
         start: clip.startTime,
         end: clip.endTime,
+        speed: clip.speed,
       });
     }
 

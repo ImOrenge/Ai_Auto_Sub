@@ -20,3 +20,6 @@ History so far uses short imperative messages (`Initial commit from Create Next 
 
 ## Environment & Configuration Tips
 Global Next.js configuration lives in `next.config.ts`; extend its object rather than rewriting it. Design tokens, icon settings, and path aliases are defined in `components.json`, and Tailwind `@theme inline` variables live in `app/globals.css` - update them together when tweaking the design system. Keep secrets in `.env.local`, which Next.js auto-loads, and avoid hardcoding API keys or endpoints inside components.
+
+### Language
+- 모든 추론 과정과 결과물은 한국어로 작성한다.

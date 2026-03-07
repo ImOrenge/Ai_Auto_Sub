@@ -112,8 +112,22 @@ export function JobDetailDrawer({ job, onClose, projectId }: JobDetailDrawerProp
                                                     <FileText className="size-4" />
                                                 </div>
                                                 <div className="text-sm">
-                                                    <p className="font-medium">Source Captions (SRT)</p>
-                                                    <p className="text-xs text-muted-foreground">Original transcription</p>
+                                                    <p className="font-medium">Processsed Captions (SRT)</p>
+                                                    <p className="text-xs text-muted-foreground">Translated or bilingual subtitles</p>
+                                                </div>
+                                            </div>
+                                            <Download className="size-4 text-muted-foreground" />
+                                        </a>
+                                    )}
+                                    {job.resultOriginalSrtUrl && (
+                                        <a href={job.resultOriginalSrtUrl} download className="flex items-center justify-between p-3 rounded-xl border hover:bg-secondary/50 transition-colors">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-amber-500/10 rounded-lg text-amber-600">
+                                                    <FileText className="size-4" />
+                                                </div>
+                                                <div className="text-sm">
+                                                    <p className="font-medium">Original Captions (SRT)</p>
+                                                    <p className="text-xs text-muted-foreground">Source language transcription</p>
                                                 </div>
                                             </div>
                                             <Download className="size-4 text-muted-foreground" />

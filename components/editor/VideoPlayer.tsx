@@ -147,6 +147,19 @@ type VideoPlayerProps = {
     } | null;
 };
 
+const isTimeWithinCue = (time: number, cue: SubtitleCue) => time >= cue.startTime && time < cue.endTime;
+
+const findActiveCueAtTime = (cues: SubtitleCue[], time: number): SubtitleCue | undefined => {
+    let latestCue: SubtitleCue | undefined;
+    for (const cue of cues) {
+        if (!isTimeWithinCue(time, cue)) continue;
+        if (!latestCue || cue.startTime >= latestCue.startTime) {
+            latestCue = cue;
+        }
+    }
+    return latestCue;
+};
+
 export function VideoPlayer({
     src,
     cuts = null,
@@ -204,6 +217,7 @@ export function VideoPlayer({
         if (videoAspectRatio === '9:16') return 9 / 16;
         if (videoAspectRatio === '1:1') return 1;
         if (videoAspectRatio === '16:9') return 16 / 9;
+        if (videoAspectRatio === '4:5') return 4 / 5;
         return 16 / 9;
     }, [videoAspectRatio, sourceDimensions]);
 
@@ -442,7 +456,7 @@ export function VideoPlayer({
 
     // Find active cue - must be within clip boundaries if activeClip is present
     useEffect(() => {
-        let matchedCue = cues.find(c => currentTime >= c.startTime && currentTime <= c.endTime);
+        let matchedCue = findActiveCueAtTime(cues, currentTime);
 
         // Filter by activeClip if present
         if (matchedCue && activeClip) {
@@ -679,6 +693,7 @@ export function VideoPlayer({
         }
         if (videoAspectRatio === '9:16') return { width: 1080, height: 1920 };
         if (videoAspectRatio === '1:1') return { width: 1080, height: 1080 };
+        if (videoAspectRatio === '4:5') return { width: 1080, height: 1350 };
         return { width: 1920, height: 1080 };
     }, [videoAspectRatio, sourceDimensions]);
 
@@ -762,14 +777,7 @@ export function VideoPlayer({
                     )}
                 </AnimatePresence>
 
-                {/* Floating Style Toolbar */}
-                {isStyleToolbarOpen && (
-                    <FloatingStyleToolbar
-                        style={defaultStyle}
-                        onChange={(updates) => setDefaultStyle({ ...defaultStyle, ...updates })}
-                        onClose={() => setIsStyleToolbarOpen(false)}
-                    />
-                )}
+
             </div>
 
             {/* Hover Floating Controls */}
@@ -836,7 +844,7 @@ export function VideoPlayer({
                                     </div>
                                 </DropdownMenuItem>
 
-                                {(['16:9', '9:16', '1:1'] as const).map((ratio) => (
+                                {(['16:9', '9:16', '1:1', '4:5'] as const).map((ratio) => (
                                     <DropdownMenuItem
                                         key={ratio}
                                         className={cn(
@@ -853,7 +861,7 @@ export function VideoPlayer({
                                         <div className="flex flex-col">
                                             <span className="text-xs font-bold capitalize">{ratio}</span>
                                             <span className="text-[9px] opacity-40">
-                                                {ratio === '9:16' ? 'TikTok / Reels' : ratio === '16:9' ? 'YouTube' : ratio === '1:1' ? 'Instagram' : 'Standard'}
+                                                {ratio === '9:16' ? 'TikTok / Reels' : ratio === '16:9' ? 'YouTube' : ratio === '1:1' ? 'Instagram' : ratio === '4:5' ? 'Feed / Portrait' : 'Standard'}
                                             </span>
                                         </div>
                                     </DropdownMenuItem>
@@ -862,116 +870,126 @@ export function VideoPlayer({
                         </DropdownMenu>
                     </div>
                 </div>
-            )}
+            )
+            }
 
             {/* Cropping Mode Overlay */}
-            {isCropping && (
-                <div
-                    ref={cropOverlayRef}
-                    className="absolute inset-0 z-40 bg-black/80 backdrop-blur-sm overflow-hidden flex items-center justify-center p-12"
-                    style={{ cursor: dragType !== 'none' ? getCursorForHandle(dragType) : 'default' }}
-                    onMouseMove={handleCropMouseMove}
-                    onMouseUp={handleCropMouseUp}
-                    onMouseLeave={handleCropMouseUp}
-                >
+            {
+                isCropping && (
                     <div
-                        className={cn(
-                            "relative transition-all shadow-xl",
-                            "bg-black ring-1 ring-white/20"
-                        )}
-                        style={{
-                            aspectRatio: containerAspectRatio,
-                            height: containerAspectRatio < 1 ? '100%' : 'auto',
-                            width: containerAspectRatio >= 1 ? '100%' : 'auto',
-                            maxHeight: '100%',
-                            maxWidth: '100%'
-                        }}
+                        ref={cropOverlayRef}
+                        className="absolute inset-0 z-40 bg-black/80 backdrop-blur-sm overflow-hidden flex items-center justify-center p-12"
+                        style={{ cursor: dragType !== 'none' ? getCursorForHandle(dragType) : 'default' }}
+                        onMouseMove={handleCropMouseMove}
+                        onMouseUp={handleCropMouseUp}
+                        onMouseLeave={handleCropMouseUp}
                     >
-                        {/* Video Background for Crop */}
-                        <div className="absolute inset-0 opacity-20">
-                            {isYouTube ? (
-                                <div className="w-full h-full bg-muted" />
-                            ) : (
-                                <video src={src} className={cn("w-full h-full", contentFitClass)} />
-                            )}
-                        </div>
-
-                        {/* Selected Area - Draggable for moving */}
                         <div
-                            className="absolute border-2 border-primary shadow-[0_0_0_9999px_rgba(0,0,0,0.6)] cursor-move"
+                            className={cn(
+                                "relative transition-all shadow-xl",
+                                "bg-black ring-1 ring-white/20"
+                            )}
                             style={{
-                                left: `${localCrop.x}%`,
-                                top: `${localCrop.y}%`,
-                                width: `${localCrop.width}%`,
-                                height: `${localCrop.height}%`,
+                                aspectRatio: containerAspectRatio,
+                                height: containerAspectRatio < 1 ? '100%' : 'auto',
+                                width: containerAspectRatio >= 1 ? '100%' : 'auto',
+                                maxHeight: '100%',
+                                maxWidth: '100%'
                             }}
-                            onMouseDown={handleMoveMouseDown}
                         >
-                            {/* Visual Grid */}
-                            <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none opacity-20">
-                                {[...Array(4)].map((_, i) => (
-                                    <div key={i} className={cn(
-                                        "border-white/50",
-                                        i < 2 ? "border-r" : "border-b"
-                                    )} />
-                                ))}
+                            {/* Video Background for Crop */}
+                            <div className="absolute inset-0 opacity-20">
+                                {isYouTube ? (
+                                    <div className="w-full h-full bg-muted" />
+                                ) : (
+                                    <video src={src} className={cn("w-full h-full", contentFitClass)} />
+                                )}
                             </div>
 
-                            {/* Corner Drag Handles */}
-                            {['nw', 'ne', 'sw', 'se'].map((corner) => (
-                                <div
-                                    key={corner}
-                                    className={cn(
-                                        "absolute size-4 bg-primary ring-4 ring-black/50 rounded-full hover:scale-125 transition-transform z-10",
-                                        corner.includes('n') ? "-top-2" : "-bottom-2",
-                                        corner.includes('w') ? "-left-2" : "-right-2",
-                                        corner === 'nw' || corner === 'se' ? "cursor-nwse-resize" : "cursor-nesw-resize"
-                                    )}
-                                    // @ts-ignore
-                                    onMouseDown={(e) => handleCornerMouseDown(e, corner as DragType)}
-                                />
-                            ))}
+                            {/* Selected Area - Draggable for moving */}
+                            <div
+                                className="absolute border-2 border-primary shadow-[0_0_0_9999px_rgba(0,0,0,0.6)] cursor-move"
+                                style={{
+                                    left: `${localCrop.x}%`,
+                                    top: `${localCrop.y}%`,
+                                    width: `${localCrop.width}%`,
+                                    height: `${localCrop.height}%`,
+                                }}
+                                onMouseDown={handleMoveMouseDown}
+                            >
+                                {/* Visual Grid */}
+                                <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none opacity-20">
+                                    {[...Array(4)].map((_, i) => (
+                                        <div key={i} className={cn(
+                                            "border-white/50",
+                                            i < 2 ? "border-r" : "border-b"
+                                        )} />
+                                    ))}
+                                </div>
 
-                            {/* Edge Drag Handles */}
-                            <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-8 h-2 bg-primary/80 rounded-full cursor-ns-resize hover:bg-primary transition-colors z-10" onMouseDown={(e) => handleCornerMouseDown(e, 'n')} />
-                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-8 h-2 bg-primary/80 rounded-full cursor-ns-resize hover:bg-primary transition-colors z-10" onMouseDown={(e) => handleCornerMouseDown(e, 's')} />
-                            <div className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-8 bg-primary/80 rounded-full cursor-ew-resize hover:bg-primary transition-colors z-10" onMouseDown={(e) => handleCornerMouseDown(e, 'w')} />
-                            <div className="absolute top-1/2 -right-1 -translate-y-1/2 w-2 h-8 bg-primary/80 rounded-full cursor-ew-resize hover:bg-primary transition-colors z-10" onMouseDown={(e) => handleCornerMouseDown(e, 'e')} />
+                                {/* Corner Drag Handles */}
+                                {['nw', 'ne', 'sw', 'se'].map((corner) => (
+                                    <div
+                                        key={corner}
+                                        className={cn(
+                                            "absolute size-4 bg-primary ring-4 ring-black/50 rounded-full hover:scale-125 transition-transform z-10",
+                                            corner.includes('n') ? "-top-2" : "-bottom-2",
+                                            corner.includes('w') ? "-left-2" : "-right-2",
+                                            corner === 'nw' || corner === 'se' ? "cursor-nwse-resize" : "cursor-nesw-resize"
+                                        )}
+                                        // @ts-ignore
+                                        onMouseDown={(e) => handleCornerMouseDown(e, corner as DragType)}
+                                    />
+                                ))}
+
+                                {/* Edge Drag Handles */}
+                                <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-8 h-2 bg-primary/80 rounded-full cursor-ns-resize hover:bg-primary transition-colors z-10" onMouseDown={(e) => handleCornerMouseDown(e, 'n')} />
+                                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-8 h-2 bg-primary/80 rounded-full cursor-ns-resize hover:bg-primary transition-colors z-10" onMouseDown={(e) => handleCornerMouseDown(e, 's')} />
+                                <div className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-8 bg-primary/80 rounded-full cursor-ew-resize hover:bg-primary transition-colors z-10" onMouseDown={(e) => handleCornerMouseDown(e, 'w')} />
+                                <div className="absolute top-1/2 -right-1 -translate-y-1/2 w-2 h-8 bg-primary/80 rounded-full cursor-ew-resize hover:bg-primary transition-colors z-10" onMouseDown={(e) => handleCornerMouseDown(e, 'e')} />
+                            </div>
+                        </div>
+
+                        {/* Toolbar */}
+                        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-black/90 backdrop-blur-2xl px-5 py-3 rounded-2xl border border-white/20 shadow-2xl">
+                            <div className="flex flex-col pr-4 border-r border-white/10">
+                                <span className="text-[10px] text-primary font-black uppercase tracking-widest mb-0.5">Crop Region</span>
+                                <span className="text-xs text-white/50 font-medium whitespace-nowrap">Drag corners to resize</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-9 px-4 text-white hover:bg-white/10 rounded-xl font-bold"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setIsCropping(false);
+                                    }}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    className="h-9 px-6 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-black uppercase tracking-tight shadow-xl shadow-primary/20"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setCropArea(localCrop);
+                                        setIsCropping(false);
+                                    }}
+                                >
+                                    Set Crop
+                                </Button>
+                            </div>
                         </div>
                     </div>
+                )}
 
-                    {/* Toolbar */}
-                    <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-black/90 backdrop-blur-2xl px-5 py-3 rounded-2xl border border-white/20 shadow-2xl">
-                        <div className="flex flex-col pr-4 border-r border-white/10">
-                            <span className="text-[10px] text-primary font-black uppercase tracking-widest mb-0.5">Crop Region</span>
-                            <span className="text-xs text-white/50 font-medium whitespace-nowrap">Drag corners to resize</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-9 px-4 text-white hover:bg-white/10 rounded-xl font-bold"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setIsCropping(false);
-                                }}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                size="sm"
-                                className="h-9 px-6 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-black uppercase tracking-tight shadow-xl shadow-primary/20"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setCropArea(localCrop);
-                                    setIsCropping(false);
-                                }}
-                            >
-                                Set Crop
-                            </Button>
-                        </div>
-                    </div>
-                </div>
+            {isStyleToolbarOpen && (
+                <FloatingStyleToolbar
+                    style={defaultStyle}
+                    onChange={(updates) => setDefaultStyle({ ...defaultStyle, ...updates })}
+                    onClose={() => setIsStyleToolbarOpen(false)}
+                />
             )}
         </div>
     );

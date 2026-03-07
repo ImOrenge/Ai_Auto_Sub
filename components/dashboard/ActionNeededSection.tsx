@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertCircle, FileEdit, ArrowRight, RotateCcw, Folder } from "lucide-react";
+import { FileEdit, ArrowRight, RotateCcw, Folder } from "lucide-react";
 import { routes } from "@/lib/routes";
+import { useLanguage } from "@/lib/i18n";
 import { JobRecord } from "@/lib/jobs/types";
 import { Project } from "@/lib/projects/types";
 
@@ -13,6 +14,8 @@ interface ActionNeededSectionProps {
 }
 
 export function ActionNeededSection({ recentProject, loading = false }: ActionNeededSectionProps) {
+    const { t } = useLanguage();
+
     if (loading) {
         return <div className="h-48 animate-pulse bg-gray-100 dark:bg-gray-800 rounded-none border" />;
     }
@@ -23,7 +26,7 @@ export function ActionNeededSection({ recentProject, loading = false }: ActionNe
 
     return (
         <section className="space-y-4">
-            <h2 className="text-xl font-semibold tracking-tight">Continue Working</h2>
+            <h2 className="text-xl font-semibold tracking-tight">{t("dashboard.actionNeeded.title")}</h2>
 
             <Link
                 href={routes.project(recentProject.id)}
@@ -40,24 +43,22 @@ export function ActionNeededSection({ recentProject, loading = false }: ActionNe
                 <div className="flex-1 min-w-0 space-y-1">
                     <div className="flex items-center gap-2">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 bg-indigo-100 dark:bg-indigo-500/20 px-2 py-0.5 rounded-none">
-                            Recently Active
+                            {t("dashboard.actionNeeded.badge")}
                         </span>
                     </div>
                     <h3 className="text-xl font-bold truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                         {recentProject.name}
                     </h3>
                     <p className="text-sm text-muted-foreground">
-                        Resume where you left off. Last updated {new Date(recentProject.updatedAt).toLocaleDateString()}
+                        {t("dashboard.actionNeeded.resume").replace("{date}", new Date(recentProject.updatedAt).toLocaleDateString())}
                     </p>
                 </div>
 
                 <div className="flex items-center gap-2 font-medium text-indigo-600 dark:text-indigo-400 group-hover:translate-x-1 transition-transform">
-                    <span>Open Editor</span>
+                    <span>{t("dashboard.actionNeeded.cta")}</span>
                     <ArrowRight className="size-4" />
                 </div>
             </Link>
         </section>
     );
 }
-
-

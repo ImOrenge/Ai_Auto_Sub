@@ -300,7 +300,8 @@ const CAPTION_PIPELINE_STEPS: PipelineStep[] = [
         const originalFile = ctx.audio.audioFile;
         ctx.audio.audioFile = trimmedPath;
         try {
-          const transcription = await callWhisper(ctx.audio);
+          const sourceLang = job.subtitleConfig?.sourceLanguage || "auto";
+          const transcription = await callWhisper(ctx.audio, sourceLang);
           return { ...ctx, transcription };
         } finally {
           ctx.audio.audioFile = originalFile;
@@ -308,21 +309,28 @@ const CAPTION_PIPELINE_STEPS: PipelineStep[] = [
         }
       } else {
         // STANDARD MODE: Transcribe whole video
-        const transcription = await callWhisper(ctx.audio);
+        const sourceLang = job.subtitleConfig?.sourceLanguage || "auto";
+        const transcription = await callWhisper(ctx.audio, sourceLang);
         return { ...ctx, transcription };
       }
     },
   },
-  // 4. 영한 번역
+  // 4. 번역
   {
     status: "translating",
     step: "translate",
     progress: 0.7,
-    run: async (_job, ctx) => {
+    run: async (job, ctx) => {
       if (!ctx.transcription) {
         throw new Error("Transcription missing before translation");
       }
-      const translation = await translateSegments(ctx.transcription, "ko");
+      
+      const targetLang = job.subtitleConfig?.targetLanguage || "ko";
+      const sourceLang = ctx.transcription.language || job.subtitleConfig?.sourceLanguage;
+      
+      console.info(`[pipeline] Translating job ${job.id} from ${sourceLang} to ${targetLang}`);
+      
+      const translation = await translateSegments(ctx.transcription, targetLang, sourceLang);
       return { ...ctx, translation };
     },
   },
@@ -440,8 +448,17 @@ export async function processJobCaptions(jobId: string) {
       throw new Error("Translation or subtitles missing after pipeline execution");
     }
 
-    // Upload SRT to storage
+    // Upload SRT to storage (translated/bilingual)
     const uploadResult = await uploadToStorage(context.subtitles);
+
+    // Also generate and upload ORIGINAL SRT if it's a translation job
+    let originalSrtResult: UploadResult | null = null;
+    if (context.transcription) {
+      const originalSrt = await generateSrt(context.transcription as any);
+      // Append -original to filename
+      originalSrt.fileName = originalSrt.fileName.replace(".srt", "-original.srt");
+      originalSrtResult = await uploadToStorage(originalSrt);
+    }
 
     // Parse SRT content to CaptionData format for editor
     // If we have a sequence, we don't apply legacy 'cuts' mapping because 
@@ -475,6 +492,7 @@ export async function processJobCaptions(jobId: string) {
       step: "subtitle",
       progress: 1,
       resultSrtUrl: uploadResult.publicUrl,
+      resultOriginalSrtUrl: originalSrtResult?.publicUrl,
       captionSource: captionData,
       errorMessage: null,
     });

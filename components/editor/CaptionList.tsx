@@ -13,12 +13,14 @@ type CaptionListProps = {
     onCueUpdate: (id: number, text: string) => void;
 };
 
+const isCueActiveAtTime = (cue: SubtitleCue, time: number) => time >= cue.startTime && time < cue.endTime;
+
 export function CaptionList({ cues, currentTime, onCueClick, onCueUpdate }: CaptionListProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
 
     // Auto-scroll to active cue
     useEffect(() => {
-        const activeIndex = cues.findIndex(c => currentTime >= c.startTime && currentTime <= c.endTime);
+        const activeIndex = cues.findIndex(c => isCueActiveAtTime(c, currentTime));
         if (activeIndex !== -1 && scrollRef.current) {
             const el = scrollRef.current.children[activeIndex] as HTMLElement;
             if (el) {
@@ -38,7 +40,7 @@ export function CaptionList({ cues, currentTime, onCueClick, onCueUpdate }: Capt
 
             <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
                 {cues.map((cue) => {
-                    const isActive = currentTime >= cue.startTime && currentTime <= cue.endTime;
+                    const isActive = isCueActiveAtTime(cue, currentTime);
                     return (
                         <div
                             key={cue.id}

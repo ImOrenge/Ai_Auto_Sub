@@ -2,11 +2,14 @@
 
 import { Lightbulb, ArrowRight, Zap } from "lucide-react";
 import Link from "next/link";
+import { useLanguage } from "@/lib/i18n";
 
 export function TipsSection() {
+    const { t } = useLanguage();
+
     return (
         <section className="space-y-4">
-            <h2 className="text-xl font-semibold tracking-tight">Tips & Updates</h2>
+            <h2 className="text-xl font-semibold tracking-tight">{t("dashboard.tips.title")}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="p-5 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 border border-amber-200 dark:border-amber-900/50 rounded-none">
                     <div className="flex items-start gap-4">
@@ -15,13 +18,13 @@ export function TipsSection() {
                         </div>
                         <div>
                             <h3 className="font-medium text-amber-900 dark:text-amber-100 mb-1">
-                                Did you know?
+                                {t("dashboard.tips.didYouKnow.title")}
                             </h3>
                             <p className="text-sm text-amber-800/80 dark:text-amber-200/70 mb-3">
-                                You can use AI to automatically translate your subtitles into multiple languages with one click.
+                                {t("dashboard.tips.didYouKnow.desc")}
                             </p>
                             <Link href="#" className="text-xs font-semibold text-amber-700 dark:text-amber-400 hover:underline flex items-center gap-1">
-                                Learn about translations <ArrowRight className="size-3" />
+                                {t("dashboard.tips.didYouKnow.cta")} <ArrowRight className="size-3" />
                             </Link>
                         </div>
                     </div>
@@ -34,13 +37,16 @@ export function TipsSection() {
                         </div>
                         <div>
                             <h3 className="font-medium text-blue-900 dark:text-blue-100 mb-1">
-                                Pro Tip: Keyboard Shortcuts
+                                {t("dashboard.tips.shortcuts.title")}
                             </h3>
                             <p className="text-sm text-blue-800/80 dark:text-blue-200/70 mb-3">
-                                Press <kbd className="px-1.5 py-0.5 rounded bg-white dark:bg-black border border-gray-200 dark:border-gray-800 font-mono text-xs">K</kbd> to pause/play and <kbd className="px-1.5 py-0.5 rounded bg-white dark:bg-black border border-gray-200 dark:border-gray-800 font-mono text-xs">J</kbd>/<kbd className="px-1.5 py-0.5 rounded bg-white dark:bg-black border border-gray-200 dark:border-gray-800 font-mono text-xs">L</kbd> to seek while editing.
+                                {t("dashboard.tips.shortcuts.desc")
+                                    .replace("{k}", "K")
+                                    .replace("{j}", "J")
+                                    .replace("{l}", "L")}
                             </p>
                             <Link href="#" className="text-xs font-semibold text-blue-700 dark:text-blue-400 hover:underline flex items-center gap-1">
-                                View all shortcuts <ArrowRight className="size-3" />
+                                {t("dashboard.tips.shortcuts.cta")} <ArrowRight className="size-3" />
                             </Link>
                         </div>
                     </div>

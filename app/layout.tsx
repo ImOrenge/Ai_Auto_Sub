@@ -22,6 +22,7 @@ export const metadata: Metadata = {
 };
 
 import { Toaster } from "@/components/ui/toaster";
+import { LanguageProvider } from "@/lib/i18n";
 
 export default function RootLayout({
   children,
@@ -29,7 +30,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko">
+    <html lang="en">
       <body
         className={cn(
           "relative min-h-screen bg-background font-sans text-foreground antialiased",
@@ -37,9 +38,10 @@ export default function RootLayout({
           geistMono.variable,
         )}
       >
-
-        {children}
-        <Toaster />
+        <LanguageProvider>
+          {children}
+          <Toaster />
+        </LanguageProvider>
       </body>
     </html>
   );

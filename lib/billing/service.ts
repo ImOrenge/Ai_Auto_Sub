@@ -103,9 +103,51 @@ export class BillingService {
     return userId;
   }
 
+  static async isSuperAdmin(userId: string): Promise<boolean> {
+    const supabase = getSupabaseServer();
+    const { data: { user }, error } = await supabase.auth.admin.getUserById(userId);
+    if (error || !user) return false;
+    return !!user.app_metadata?.is_super_admin;
+  }
+
   // Calculate Entitlements (Active Plan + Usage)
   static async getEntitlements(userId: string = MOCK_USER_ID): Promise<EntitlementSummary> {
     const supabase = getSupabaseServer();
+    
+    // Check Super Admin bypass
+    const isSuperAdmin = await this.isSuperAdmin(userId);
+    
+    if (isSuperAdmin) {
+      const { count: activeCount } = await supabase
+        .from('jobs')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .not('status', 'in', '("done","error","canceled","awaiting_edit","editing","ready_to_export")');
+
+      return {
+        planId: "enterprise" as PlanId,
+        planName: "Super Admin",
+        credits: {
+          total: 999999,
+          used: 0,
+          remaining: 999999,
+          isOverLimit: false
+        },
+        jobs: {
+          concurrentExportsLimit: 99,
+          activeCount: activeCount || 0
+        },
+        storage: {
+          retentionDays: 3650
+        },
+        exportResolutionLimit: "uhd",
+        features: {
+          queuePriority: "highest",
+          templateAccess: "all"
+        }
+      };
+    }
+
     const subscription = await this.getSubscription(userId);
     const planConfig = await this.getPlanConfig(subscription.planId);
     
@@ -352,6 +394,10 @@ export class BillingService {
     if (r === "4k") r = "uhd";
 
     if (r === "sd") return true;
+    
+    // Special case for Super Admin (enterprise planId is used in getEntitlements for super admins)
+    if (userLimit === "uhd") return true; 
+
     if (!userLimit) return r === "hd" || r === "sd";
 
     const userIdx = RESOLUTION_ORDER.indexOf(userLimit as any);
